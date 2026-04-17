@@ -51,4 +51,18 @@ battleship/
 
 ## Deployment
 
-Configured for Railway deployment. Build command: `npm run build`. Start command: `npm run start`.
+Configured for Render (free tier). A `render.yaml` is included for one-click deployment.
+
+**Build command:** `npm run install:all && npm run build`
+**Start command:** `npm run start`
+**Environment variable:** `DATABASE_URL=file:./dev.db`
+
+### Deploy to Render
+
+1. Push this repo to GitHub
+2. Go to [render.com](https://render.com) and create a new Web Service
+3. Connect your GitHub repo
+4. Render will auto-detect the `render.yaml` config
+5. Click "Create Web Service"
+
+The app will be live at `https://battleship-XXXX.onrender.com` (free tier spins down after 15 min inactivity, first request after sleep takes ~30s).

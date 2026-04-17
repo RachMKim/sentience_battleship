@@ -7,6 +7,7 @@ export function useGame(socket: Socket | null) {
   const [gameId, setGameId] = useState<string | null>(null);
   const [lastShot, setLastShot] = useState<ShotResult | null>(null);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!socket) return;
@@ -75,7 +76,7 @@ export function useGame(socket: Socket | null) {
       if (!socket) return;
       socket.emit('join-game', { gameId: joinGameId }, (response: { gameId?: string; state?: ClientGameState; error?: string }) => {
         if (response.error) {
-          alert(response.error);
+          setError(response.error);
           return;
         }
         setGameId(response.gameId!);
@@ -94,7 +95,7 @@ export function useGame(socket: Socket | null) {
       if (!socket || !gameId) return;
       socket.emit('place-ships', { gameId, placements }, (response: { success?: boolean; error?: string }) => {
         if (response.error) {
-          alert(response.error);
+          setError(response.error);
         }
       });
     },
@@ -128,11 +129,13 @@ export function useGame(socket: Socket | null) {
     gameId,
     lastShot,
     opponentDisconnected,
+    error,
     createGame,
     joinGame,
     placeShips,
     fireShot,
     resetGame,
     setLastShot,
+    setError,
   };
 }

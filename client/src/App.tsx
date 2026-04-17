@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useSocket } from './hooks/useSocket';
 import { useGame } from './hooks/useGame';
@@ -14,8 +14,15 @@ type Screen = 'menu' | 'game' | 'history';
 
 function App() {
   const { socket, connected } = useSocket();
-  const { gameState, gameId, lastShot, opponentDisconnected, createGame, joinGame, placeShips, fireShot, resetGame, setLastShot } = useGame(socket);
+  const { gameState, gameId, lastShot, opponentDisconnected, error, createGame, joinGame, placeShips, fireShot, resetGame, setLastShot, setError } = useGame(socket);
   const [screen, setScreen] = useState<Screen>('menu');
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, setError]);
 
   const handleStartAI = useCallback(
     (difficulty: AIDifficulty) => {
@@ -55,19 +62,37 @@ function App() {
     }
   }, [gameState, resetGame, createGame]);
 
+  const errorToast = (
+    <AnimatePresence>
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, y: -30, scale: 0.8 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -20, scale: 0.8 }}
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-xl border border-neon-red/50 bg-neon-red/20 text-neon-red font-display tracking-wider text-sm backdrop-blur-sm"
+        >
+          {error}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
   if (screen === 'history') {
     return <GameHistory onBack={() => setScreen('menu')} />;
   }
 
   if (screen === 'menu' || !gameState) {
     return (
-      <Menu
-        onStartAI={handleStartAI}
-        onCreateMultiplayer={handleCreateMultiplayer}
-        onJoinMultiplayer={handleJoinMultiplayer}
-        onViewHistory={() => setScreen('history')}
-        connected={connected}
-      />
+      <>
+        {errorToast}
+        <Menu
+          onStartAI={handleStartAI}
+          onCreateMultiplayer={handleCreateMultiplayer}
+          onJoinMultiplayer={handleJoinMultiplayer}
+          onViewHistory={() => setScreen('history')}
+          connected={connected}
+        />
+      </>
     );
   }
 
@@ -83,6 +108,7 @@ function App() {
 
   return (
     <div className="relative">
+      {errorToast}
       {/* Opponent disconnected banner */}
       <AnimatePresence>
         {opponentDisconnected && gameState.phase !== 'finished' && (
@@ -90,9 +116,15 @@ function App() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            className="fixed top-0 left-0 right-0 z-50 bg-neon-red/20 border-b border-neon-red/30 py-2 text-center"
+            className="fixed top-0 left-0 right-0 z-50 bg-neon-red/20 border-b border-neon-red/30 py-3 text-center flex items-center justify-center gap-4"
           >
             <span className="text-neon-red text-sm font-display tracking-wider">OPPONENT DISCONNECTED</span>
+            <button
+              onClick={handleMenu}
+              className="px-3 py-1 text-xs font-display tracking-wider rounded-lg border border-neon-red/40 text-white bg-neon-red/10 hover:bg-neon-red/20 transition-colors"
+            >
+              RETURN TO MENU
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { BoardGrid, Orientation, ShipName, ShipPlacement as ShipPlacementType } from '../lib/types';
+import type { BoardGrid, Orientation, ShipPlacement as ShipPlacementType } from '../lib/types';
 import { BOARD_SIZE, SHIPS } from '../lib/types';
 import { COLUMN_LABELS, ROW_LABELS, SHIP_COLORS, SHIP_LABELS } from '../lib/constants';
 import { useSoundEffects } from '../hooks/useSoundEffects';

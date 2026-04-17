@@ -59,15 +59,28 @@ export function updateAIState(
 
     if (sunk && shipName) {
       aiState.remainingShips = aiState.remainingShips.filter(s => s.name !== shipName);
-      const sunkShipHits = aiState.hits.filter(h => {
-        return true;
-      });
+
+      const sunkShipHits = findConnectedHits(aiState.hits, x, y);
+      const sunkSet = new Set(sunkShipHits.map(h => `${h.x},${h.y}`));
+      aiState.hits = aiState.hits.filter(h => !sunkSet.has(`${h.x},${h.y}`));
+
       aiState.targetQueue = aiState.targetQueue.filter(t =>
         !aiState.shotHistory[t.y][t.x]
       );
-      if (aiState.targetQueue.length === 0) {
+
+      if (aiState.hits.length > 0) {
+        aiState.mode = 'target';
+        for (const h of aiState.hits) {
+          const adjacent = getAdjacentCells(h.x, h.y);
+          for (const adj of adjacent) {
+            if (!aiState.shotHistory[adj.y][adj.x] &&
+                !aiState.targetQueue.some(t => t.x === adj.x && t.y === adj.y)) {
+              aiState.targetQueue.push(adj);
+            }
+          }
+        }
+      } else if (aiState.targetQueue.length === 0) {
         aiState.mode = 'hunt';
-        aiState.hits = [];
       }
     }
   } else {
@@ -262,6 +275,33 @@ function canShipFitWithHits(
     if (isHit) hitsOverlap = true;
   }
   return hitsOverlap;
+}
+
+function findConnectedHits(
+  hits: { x: number; y: number }[],
+  startX: number,
+  startY: number
+): { x: number; y: number }[] {
+  const hitSet = new Set(hits.map(h => `${h.x},${h.y}`));
+  const visited = new Set<string>();
+  const result: { x: number; y: number }[] = [];
+  const stack = [{ x: startX, y: startY }];
+
+  while (stack.length > 0) {
+    const pos = stack.pop()!;
+    const key = `${pos.x},${pos.y}`;
+    if (visited.has(key) || !hitSet.has(key)) continue;
+    visited.add(key);
+    result.push(pos);
+
+    for (const adj of getAdjacentCells(pos.x, pos.y)) {
+      if (!visited.has(`${adj.x},${adj.y}`)) {
+        stack.push(adj);
+      }
+    }
+  }
+
+  return result;
 }
 
 function getAdjacentCells(x: number, y: number): { x: number; y: number }[] {
