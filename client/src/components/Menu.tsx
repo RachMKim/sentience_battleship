@@ -141,9 +141,11 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onStartAI('easy')}
+              disabled={!connected}
               className="w-full py-3 px-6 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-xl
                 border border-neon-green/30 text-white font-display tracking-wider
-                hover:border-neon-green/60 transition-all duration-300 btn-3d"
+                hover:border-neon-green/60 transition-all duration-300 btn-3d
+                disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <div className="flex justify-between items-center">
                 <span>EASY</span>
@@ -154,9 +156,11 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onStartAI('medium')}
+              disabled={!connected}
               className="w-full py-3 px-6 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-xl
                 border border-neon-yellow/30 text-white font-display tracking-wider
-                hover:border-neon-yellow/60 transition-all duration-300 btn-3d"
+                hover:border-neon-yellow/60 transition-all duration-300 btn-3d
+                disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <div className="flex justify-between items-center">
                 <span>MEDIUM</span>
@@ -167,9 +171,11 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onStartAI('hard')}
+              disabled={!connected}
               className="w-full py-3 px-6 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-xl
                 border border-neon-red/30 text-white font-display tracking-wider
-                hover:border-neon-red/60 transition-all duration-300 btn-3d"
+                hover:border-neon-red/60 transition-all duration-300 btn-3d
+                disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <div className="flex justify-between items-center">
                 <span>HARD</span>

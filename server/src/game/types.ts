@@ -73,7 +73,7 @@ export interface ClientGameState {
   opponentBoard: BoardGrid;
   myShips: ShipPlacement[];
   myShipHealth: Record<ShipName, number>;
-  opponentShipHealth: Record<ShipName, number>;
+  opponentShipsSunk: Record<ShipName, boolean>;
   winner: string | null;
   playerId: string;
   aiDifficulty?: AIDifficulty;

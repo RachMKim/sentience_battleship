@@ -22,7 +22,7 @@ export function createAIState(): AIState {
 
 export function getAIShot(
   aiState: AIState,
-  opponentGrid: BoardGrid,
+  _opponentGrid: BoardGrid,
   difficulty: AIDifficulty
 ): { x: number; y: number } {
   switch (difficulty) {
@@ -32,6 +32,8 @@ export function getAIShot(
       return getHuntTargetShot(aiState);
     case 'hard':
       return getProbabilityShot(aiState);
+    default:
+      return getHuntTargetShot(aiState);
   }
 }
 
@@ -103,6 +105,7 @@ function getRandomShot(aiState: AIState): { x: number; y: number } {
       }
     }
   }
+  if (available.length === 0) return { x: 0, y: 0 };
   return available[Math.floor(Math.random() * available.length)];
 }
 

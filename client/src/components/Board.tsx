@@ -39,7 +39,7 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
         <div className="board-3d">
           <div className="relative">
             {/* Column labels */}
-            <div className="flex mb-1" style={{ marginLeft: cellSize === 40 ? '2rem' : '2rem' }}>
+            <div className="flex mb-1" style={{ marginLeft: '2rem' }}>
               {COLUMN_LABELS.map(label => (
                 <div key={label} className="text-center text-xs text-ocean-400/80 font-mono" style={{ width: `${cellSize}px` }}>
                   {label}
@@ -60,10 +60,11 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
               {/* Grid with 3D frame and ship overlays */}
               <div className="relative">
                 <div
-                  className="grid gap-[2px] p-1.5 rounded-lg board-frame water-shimmer"
+                  className="grid gap-[2px] p-1.5 rounded-lg board-frame water-shimmer relative"
                   style={{
                     gridTemplateColumns: `repeat(10, ${cellSize}px)`,
                     gridTemplateRows: `repeat(10, ${cellSize}px)`,
+                    zIndex: 1,
                   }}
                 >
                   {grid.map((row, y) =>
@@ -86,13 +87,15 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
                 {/* 3D Ship overlays */}
                 {isOwner && ships && ships.length > 0 && (
                   <div
-                    className="absolute pointer-events-none"
+                    className="absolute"
                     style={{
                       top: 6,
                       left: 6,
                       right: 6,
                       bottom: 6,
                       transformStyle: 'preserve-3d',
+                      pointerEvents: 'none',
+                      zIndex: 0,
                     }}
                   >
                     {ships.map(ship => (

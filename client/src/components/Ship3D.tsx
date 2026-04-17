@@ -176,7 +176,7 @@ export function Ship3D({ placement, cellSize, sunk }: Ship3DProps) {
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: sunk ? 0.4 : 1, scale: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="absolute pointer-events-none"
+      className="absolute"
       style={{
         left: left + (isHorizontal ? 0 : (cellSize - shipWidth) / 2),
         top: top + (isHorizontal ? (cellSize - shipWidth) / 2 : 0),
@@ -184,7 +184,7 @@ export function Ship3D({ placement, cellSize, sunk }: Ship3DProps) {
         height: isHorizontal ? shipWidth : totalLength,
         transformStyle: 'preserve-3d',
         transform: `translateZ(3px)`,
-        zIndex: 5,
+        pointerEvents: 'none',
         filter: sunk ? 'grayscale(0.7) brightness(0.5)' : 'none',
       }}
     >

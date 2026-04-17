@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { CellState } from '../lib/types';
+import { COLUMN_LABELS } from '../lib/constants';
 
 interface CellProps {
   cell: CellState;
@@ -13,6 +15,8 @@ interface CellProps {
 }
 
 export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, disabled }: CellProps) {
+  const [hovered, setHovered] = useState(false);
+
   const handleClick = () => {
     if (!disabled && onClick) onClick(x, y);
   };
@@ -49,6 +53,7 @@ export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, dis
     depthClass = 'cell-3d-ship';
   }
 
+  // Placement hover (from ShipPlacement component)
   if (isHovering) {
     depthClass = 'cell-3d';
     bgClass = hoverValid
@@ -58,21 +63,38 @@ export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, dis
 
   const isClickable = !disabled && onClick && !cell.isHit;
 
+  // Targeting hover for firing phase (enemy board)
+  const showTargetHover = hovered && isClickable && !isOwner && !isHovering;
+
+  const coordLabel = `${COLUMN_LABELS[x] || x}${y + 1}`;
+
   return (
     <motion.button
       onClick={handleClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       disabled={disabled || cell.isHit}
-      whileHover={isClickable ? { scale: 1.12, zIndex: 10, translateZ: '6px' } : undefined}
+      whileHover={isClickable ? { scale: 1.08, zIndex: 10 } : undefined}
       whileTap={isClickable ? { scale: 0.92 } : undefined}
+      aria-label={`${coordLabel}${cell.isHit ? (cell.hasShip ? ', hit' : ', miss') : ''}`}
       className={`
-        w-full aspect-square rounded-[3px] border border-ocean-600/20 flex items-center justify-center
-        transition-all duration-150
+        w-full aspect-square rounded-[3px] border flex items-center justify-center
+        transition-all duration-150 relative
         ${depthClass}
-        ${bgClass}
-        ${isClickable ? 'cursor-crosshair hover:border-neon-blue/50 hover:shadow-[0_0_10px_rgba(0,212,255,0.15)]' : 'cursor-default'}
+        ${showTargetHover
+          ? 'bg-neon-blue/20 border-neon-blue/60 shadow-[0_0_14px_rgba(0,212,255,0.3),inset_0_0_8px_rgba(0,212,255,0.1)]'
+          : `${bgClass} border-ocean-600/20`
+        }
+        ${isClickable ? 'cursor-crosshair' : 'cursor-default'}
       `}
     >
       {content}
+      {showTargetHover && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-2 h-2 rounded-full bg-neon-blue/60 shadow-[0_0_8px_rgba(0,212,255,0.6)]" />
+          <div className="absolute inset-[3px] border border-neon-blue/30 rounded-[2px]" />
+        </div>
+      )}
     </motion.button>
   );
 }

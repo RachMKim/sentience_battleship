@@ -68,21 +68,27 @@ export function placeShip(
 }
 
 export function placeShipsRandomly(board: PlayerBoard): void {
-  for (const ship of SHIPS) {
-    let placed = false;
-    let attempts = 0;
-    while (!placed && attempts < 1000) {
-      const orientation: Orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
-      const x = Math.floor(Math.random() * BOARD_SIZE);
-      const y = Math.floor(Math.random() * BOARD_SIZE);
-      placed = placeShip(board, {
-        name: ship.name,
-        x,
-        y,
-        orientation,
-        length: ship.length,
-      });
-      attempts++;
+  for (let retry = 0; retry < 100; retry++) {
+    const testBoard = createEmptyBoard();
+    let allPlaced = true;
+
+    for (const ship of SHIPS) {
+      let placed = false;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const orientation: Orientation = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+        const x = Math.floor(Math.random() * BOARD_SIZE);
+        const y = Math.floor(Math.random() * BOARD_SIZE);
+        placed = placeShip(testBoard, { name: ship.name, x, y, orientation, length: ship.length });
+        if (placed) break;
+      }
+      if (!placed) { allPlaced = false; break; }
+    }
+
+    if (allPlaced) {
+      board.grid = testBoard.grid;
+      board.ships = testBoard.ships;
+      board.shipHealth = testBoard.shipHealth;
+      return;
     }
   }
 }

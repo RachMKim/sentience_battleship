@@ -34,7 +34,7 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: Firing
     return () => clearTimeout(timer);
   }, [lastShot, playHit, playMiss, playSunk, onClearShot]);
 
-  const opponentShipsRemaining = Object.entries(gameState.opponentShipHealth).filter(([, hp]) => hp > 0).length;
+  const opponentShipsRemaining = Object.entries(gameState.opponentShipsSunk).filter(([, sunk]) => !sunk).length;
   const myShipsRemaining = Object.entries(gameState.myShipHealth).filter(([, hp]) => hp > 0).length;
 
   return (
@@ -90,8 +90,8 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: Firing
                 : '0 4px 12px rgba(0,0,0,0.3), 0 2px 0 rgba(0,0,0,0.2)'
             }}
           >
-            {lastShot.sunk
-              ? `${SHIP_LABELS[lastShot.shipName!]} SUNK!`
+            {lastShot.sunk && lastShot.shipName
+              ? `${SHIP_LABELS[lastShot.shipName as keyof typeof SHIP_LABELS] || lastShot.shipName} SUNK!`
               : lastShot.hit
               ? 'HIT!'
               : 'MISS'}
@@ -139,16 +139,40 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: Firing
 
       {/* Ship status panels */}
       <div className="flex flex-col lg:flex-row gap-6 mt-6 w-full max-w-4xl">
-        <ShipStatusPanel
+        <OpponentShipStatusPanel
           title="ENEMY FLEET"
-          shipHealth={gameState.opponentShipHealth}
-          isOpponent={true}
+          shipsSunk={gameState.opponentShipsSunk}
         />
         <ShipStatusPanel
           title="YOUR FLEET"
           shipHealth={gameState.myShipHealth}
           isOpponent={false}
         />
+      </div>
+    </div>
+  );
+}
+
+function OpponentShipStatusPanel({ title, shipsSunk }: {
+  title: string;
+  shipsSunk: Record<string, boolean>;
+}) {
+  return (
+    <div className="flex-1 glass-panel rounded-xl border border-ocean-700/30 p-4">
+      <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-3"
+        style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{title}</h4>
+      <div className="space-y-1.5">
+        {Object.entries(shipsSunk).map(([name, sunk]) => (
+          <div key={name} className="flex items-center justify-between text-xs">
+            <span className={`font-display tracking-wider ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
+              {SHIP_LABELS[name as keyof typeof SHIP_LABELS]}
+            </span>
+            <span className={`font-display tracking-wider text-[10px] ${sunk ? 'text-hit' : 'text-ocean-500'}`}
+              style={{ textShadow: sunk ? '0 0 6px rgba(255,51,102,0.4)' : 'none' }}>
+              {sunk ? 'SUNK' : 'ACTIVE'}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

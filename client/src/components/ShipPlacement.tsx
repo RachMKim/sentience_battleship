@@ -248,8 +248,8 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
                 </div>
                 <div className="relative">
                   <div
-                    className="grid gap-[2px] p-1.5 rounded-lg board-frame water-shimmer"
-                    style={{ gridTemplateColumns: 'repeat(10, 2.5rem)', gridTemplateRows: 'repeat(10, 2.5rem)' }}
+                    className="grid gap-[2px] p-1.5 rounded-lg board-frame water-shimmer relative"
+                    style={{ gridTemplateColumns: 'repeat(10, 2.5rem)', gridTemplateRows: 'repeat(10, 2.5rem)', zIndex: 1 }}
                   >
                     {grid.map((row, y) =>
                       row.map((cell, x) => {
@@ -286,13 +286,15 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
                   {/* 3D Ship overlays */}
                   {placements.length > 0 && (
                     <div
-                      className="absolute pointer-events-none"
+                      className="absolute"
                       style={{
                         top: 6,
                         left: 6,
                         right: 6,
                         bottom: 6,
                         transformStyle: 'preserve-3d',
+                        pointerEvents: 'none',
+                        zIndex: 0,
                       }}
                     >
                       {placements.map(ship => (

@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../game/prisma.js';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 router.get('/api/games', async (_req, res) => {
@@ -20,7 +19,8 @@ router.get('/api/games', async (_req, res) => {
       },
     });
     res.json(games);
-  } catch {
+  } catch (err) {
+    console.error('Failed to fetch games:', err);
     res.status(500).json({ error: 'Failed to fetch games' });
   }
 });
@@ -29,7 +29,13 @@ router.get('/api/games/:id', async (req, res) => {
   try {
     const game = await prisma.game.findUnique({
       where: { id: req.params.id },
-      include: {
+      select: {
+        id: true,
+        mode: true,
+        status: true,
+        winner: true,
+        createdAt: true,
+        updatedAt: true,
         moves: { orderBy: { timestamp: 'asc' } },
       },
     });
@@ -38,7 +44,8 @@ router.get('/api/games/:id', async (req, res) => {
       return;
     }
     res.json(game);
-  } catch {
+  } catch (err) {
+    console.error('Failed to fetch game:', req.params.id, err);
     res.status(500).json({ error: 'Failed to fetch game' });
   }
 });
