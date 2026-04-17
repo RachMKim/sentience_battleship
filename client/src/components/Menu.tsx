@@ -32,7 +32,7 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
     <div className="min-h-screen flex flex-col items-center justify-center px-4">
       {/* Background animated grid lines */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(0,212,255,0.05)_0%,_transparent_70%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(0,212,255,0.06)_0%,_transparent_70%)]" />
         {Array.from({ length: 12 }).map((_, i) => (
           <motion.div
             key={i}
@@ -50,18 +50,21 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
         animate="visible"
         className="relative z-10 flex flex-col items-center gap-8 max-w-md w-full"
       >
-        {/* Title */}
+        {/* Title with 3D depth */}
         <motion.div variants={itemVariants} className="text-center">
           <h1 className="text-5xl md:text-6xl font-display font-black tracking-wider text-white mb-2">
-            <span className="drop-shadow-[0_0_20px_rgba(0,212,255,0.5)]">BATTLE</span>
-            <span className="text-neon-blue drop-shadow-[0_0_20px_rgba(0,212,255,0.8)]">SHIP</span>
+            <span className="text-3d drop-shadow-[0_0_20px_rgba(0,212,255,0.5)]">BATTLE</span>
+            <span className="text-neon-blue text-3d drop-shadow-[0_0_20px_rgba(0,212,255,0.8)]">SHIP</span>
           </h1>
-          <p className="text-ocean-400 text-sm tracking-widest uppercase">Naval Warfare Simulator</p>
+          <p className="text-ocean-400 text-sm tracking-widest uppercase"
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+            Naval Warfare Simulator
+          </p>
         </motion.div>
 
         {/* Connection status */}
         <motion.div variants={itemVariants} className="flex items-center gap-2 text-xs">
-          <div className={`w-2 h-2 rounded-full ${connected ? 'bg-neon-green animate-pulse' : 'bg-neon-red'}`} />
+          <div className={`w-2 h-2 rounded-full ${connected ? 'bg-neon-green animate-pulse shadow-[0_0_8px_rgba(0,255,136,0.5)]' : 'bg-neon-red shadow-[0_0_8px_rgba(255,51,102,0.5)]'}`} />
           <span className="text-ocean-400">{connected ? 'Connected' : 'Connecting...'}</span>
         </motion.div>
 
@@ -70,13 +73,13 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
           <>
             <motion.button
               variants={itemVariants}
-              whileHover={{ scale: 1.02, boxShadow: '0 0 30px rgba(0, 212, 255, 0.3)' }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setShowDifficulty(true)}
               disabled={!connected}
-              className="w-full py-4 px-6 bg-gradient-to-r from-ocean-700 to-ocean-600 rounded-xl
+              className="w-full py-4 px-6 bg-gradient-to-b from-ocean-600 to-ocean-700 rounded-xl
                 border border-neon-blue/30 text-white font-display text-lg tracking-wider
-                hover:border-neon-blue/60 transition-all duration-300
+                hover:border-neon-blue/60 transition-all duration-300 btn-3d
                 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               VS COMPUTER
@@ -84,13 +87,13 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
 
             <motion.button
               variants={itemVariants}
-              whileHover={{ scale: 1.02, boxShadow: '0 0 30px rgba(0, 255, 136, 0.2)' }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onCreateMultiplayer}
               disabled={!connected}
-              className="w-full py-4 px-6 bg-gradient-to-r from-ocean-700 to-ocean-600 rounded-xl
+              className="w-full py-4 px-6 bg-gradient-to-b from-ocean-600 to-ocean-700 rounded-xl
                 border border-neon-green/30 text-white font-display text-lg tracking-wider
-                hover:border-neon-green/60 transition-all duration-300
+                hover:border-neon-green/60 transition-all duration-300 btn-3d
                 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               CREATE ROOM
@@ -98,13 +101,13 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
 
             <motion.button
               variants={itemVariants}
-              whileHover={{ scale: 1.02, boxShadow: '0 0 30px rgba(255, 136, 0, 0.2)' }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setShowJoin(true)}
               disabled={!connected}
-              className="w-full py-4 px-6 bg-gradient-to-r from-ocean-700 to-ocean-600 rounded-xl
+              className="w-full py-4 px-6 bg-gradient-to-b from-ocean-600 to-ocean-700 rounded-xl
                 border border-neon-orange/30 text-white font-display text-lg tracking-wider
-                hover:border-neon-orange/60 transition-all duration-300
+                hover:border-neon-orange/60 transition-all duration-300 btn-3d
                 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               JOIN ROOM
@@ -116,6 +119,7 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               whileTap={{ scale: 0.98 }}
               onClick={onViewHistory}
               className="text-ocean-400 hover:text-ocean-300 text-sm font-display tracking-wider transition-colors"
+              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
             >
               GAME HISTORY
             </motion.button>
@@ -129,13 +133,17 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
             animate={{ opacity: 1, y: 0 }}
             className="w-full flex flex-col gap-3"
           >
-            <p className="text-center text-ocean-300 font-display text-sm tracking-wider mb-2">SELECT DIFFICULTY</p>
+            <p className="text-center text-ocean-300 font-display text-sm tracking-wider mb-2"
+              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+              SELECT DIFFICULTY
+            </p>
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onStartAI('easy')}
-              className="w-full py-3 px-6 bg-ocean-800 rounded-xl border border-neon-green/30
-                text-white font-display tracking-wider hover:border-neon-green/60 transition-all duration-300"
+              className="w-full py-3 px-6 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-xl
+                border border-neon-green/30 text-white font-display tracking-wider
+                hover:border-neon-green/60 transition-all duration-300 btn-3d"
             >
               <div className="flex justify-between items-center">
                 <span>EASY</span>
@@ -146,8 +154,9 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onStartAI('medium')}
-              className="w-full py-3 px-6 bg-ocean-800 rounded-xl border border-neon-yellow/30
-                text-white font-display tracking-wider hover:border-neon-yellow/60 transition-all duration-300"
+              className="w-full py-3 px-6 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-xl
+                border border-neon-yellow/30 text-white font-display tracking-wider
+                hover:border-neon-yellow/60 transition-all duration-300 btn-3d"
             >
               <div className="flex justify-between items-center">
                 <span>MEDIUM</span>
@@ -158,8 +167,9 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => onStartAI('hard')}
-              className="w-full py-3 px-6 bg-ocean-800 rounded-xl border border-neon-red/30
-                text-white font-display tracking-wider hover:border-neon-red/60 transition-all duration-300"
+              className="w-full py-3 px-6 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-xl
+                border border-neon-red/30 text-white font-display tracking-wider
+                hover:border-neon-red/60 transition-all duration-300 btn-3d"
             >
               <div className="flex justify-between items-center">
                 <span>HARD</span>
@@ -182,7 +192,10 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
             animate={{ opacity: 1, y: 0 }}
             className="w-full flex flex-col gap-3"
           >
-            <p className="text-center text-ocean-300 font-display text-sm tracking-wider mb-2">ENTER ROOM CODE</p>
+            <p className="text-center text-ocean-300 font-display text-sm tracking-wider mb-2"
+              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+              ENTER ROOM CODE
+            </p>
             <input
               type="text"
               value={joinCode}
@@ -190,15 +203,17 @@ export function Menu({ onStartAI, onCreateMultiplayer, onJoinMultiplayer, onView
               placeholder="Room code..."
               className="w-full py-3 px-4 bg-ocean-800 rounded-xl border border-ocean-600
                 text-white placeholder-ocean-500 font-mono text-center text-lg tracking-widest
-                focus:outline-none focus:border-neon-blue/60"
+                focus:outline-none focus:border-neon-blue/60
+                shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_1px_0_rgba(255,255,255,0.03)]"
               autoFocus
             />
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => { if (joinCode.trim()) onJoinMultiplayer(joinCode.trim()); }}
-              className="w-full py-3 px-6 bg-neon-blue/20 rounded-xl border border-neon-blue/40
-                text-white font-display tracking-wider hover:bg-neon-blue/30 transition-all duration-300"
+              className="w-full py-3 px-6 bg-gradient-to-b from-neon-blue/20 to-neon-blue/10 rounded-xl
+                border border-neon-blue/40 text-white font-display tracking-wider
+                hover:bg-neon-blue/30 transition-all duration-300 btn-3d"
             >
               JOIN
             </motion.button>

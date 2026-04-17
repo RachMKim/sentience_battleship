@@ -4,6 +4,7 @@ import type { BoardGrid, Orientation, ShipPlacement as ShipPlacementType } from 
 import { BOARD_SIZE, SHIPS } from '../lib/types';
 import { COLUMN_LABELS, ROW_LABELS, SHIP_COLORS, SHIP_LABELS } from '../lib/constants';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import { Ship3D } from './Ship3D';
 
 interface ShipPlacementProps {
   onConfirm: (placements: ShipPlacementType[]) => void;
@@ -150,9 +151,10 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-            className="w-12 h-12 border-2 border-neon-blue/30 border-t-neon-blue rounded-full mx-auto mb-6"
+            className="w-12 h-12 border-2 border-neon-blue/30 border-t-neon-blue rounded-full mx-auto mb-6
+              shadow-[0_0_12px_rgba(0,212,255,0.3)]"
           />
-          <h2 className="text-2xl font-display text-white mb-2">SHIPS DEPLOYED</h2>
+          <h2 className="text-2xl font-display text-white mb-2 text-3d">SHIPS DEPLOYED</h2>
           <p className="text-ocean-400">Waiting for opponent to place their ships...</p>
         </motion.div>
       </div>
@@ -167,14 +169,21 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
         className="flex flex-col items-center gap-6"
       >
         <div className="text-center">
-          <h2 className="text-2xl font-display text-white tracking-wider mb-1">DEPLOY YOUR FLEET</h2>
+          <h2 className="text-2xl font-display text-white tracking-wider mb-1 text-3d">DEPLOY YOUR FLEET</h2>
           {currentShip && (
             <p className="text-ocean-400 text-sm">
-              Placing: <span className="text-neon-blue font-semibold">{SHIP_LABELS[currentShip.name]}</span>
+              Placing: <span className="text-neon-blue font-semibold"
+                style={{ textShadow: '0 0 8px rgba(0,212,255,0.4)' }}>
+                {SHIP_LABELS[currentShip.name]}
+              </span>
               <span className="text-ocean-500"> ({currentShip.length} cells)</span>
             </p>
           )}
-          {allPlaced && <p className="text-neon-green text-sm">All ships placed! Confirm when ready.</p>}
+          {allPlaced && (
+            <p className="text-neon-green text-sm" style={{ textShadow: '0 0 8px rgba(0,255,136,0.4)' }}>
+              All ships placed! Confirm when ready.
+            </p>
+          )}
         </div>
 
         {/* Controls */}
@@ -183,8 +192,8 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setOrientation(o => o === 'horizontal' ? 'vertical' : 'horizontal')}
-            className="px-4 py-2 bg-ocean-800 rounded-lg border border-ocean-600 text-ocean-300
-              hover:border-neon-blue/50 transition-all text-sm font-display tracking-wider"
+            className="px-4 py-2 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-lg border border-ocean-600 text-ocean-300
+              hover:border-neon-blue/50 transition-all text-sm font-display tracking-wider btn-3d"
           >
             {orientation === 'horizontal' ? '↔ HORIZONTAL' : '↕ VERTICAL'}
           </motion.button>
@@ -192,8 +201,8 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleRandomize}
-            className="px-4 py-2 bg-ocean-800 rounded-lg border border-ocean-600 text-ocean-300
-              hover:border-neon-orange/50 transition-all text-sm font-display tracking-wider"
+            className="px-4 py-2 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-lg border border-ocean-600 text-ocean-300
+              hover:border-neon-orange/50 transition-all text-sm font-display tracking-wider btn-3d"
           >
             RANDOMIZE
           </motion.button>
@@ -202,8 +211,8 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
             whileTap={{ scale: 0.95 }}
             onClick={handleUndo}
             disabled={placements.length === 0}
-            className="px-4 py-2 bg-ocean-800 rounded-lg border border-ocean-600 text-ocean-300
-              hover:border-neon-red/50 transition-all text-sm font-display tracking-wider
+            className="px-4 py-2 bg-gradient-to-b from-ocean-700 to-ocean-800 rounded-lg border border-ocean-600 text-ocean-300
+              hover:border-neon-red/50 transition-all text-sm font-display tracking-wider btn-3d
               disabled:opacity-30 disabled:cursor-not-allowed"
           >
             UNDO
@@ -211,60 +220,92 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
         </div>
 
         {/* Keyboard hint */}
-        <p className="text-ocean-500 text-xs">Press <kbd className="px-1.5 py-0.5 bg-ocean-800 rounded text-ocean-300">R</kbd> to rotate</p>
+        <p className="text-ocean-500 text-xs">Press <kbd className="px-1.5 py-0.5 bg-ocean-800 rounded text-ocean-300
+          shadow-[0_2px_0_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.05)]">R</kbd> to rotate</p>
 
-        {/* Board */}
+        {/* Board with 3D perspective */}
         <div
           className="relative"
           onKeyDown={(e) => { if (e.key === 'r' || e.key === 'R') setOrientation(o => o === 'horizontal' ? 'vertical' : 'horizontal'); }}
           tabIndex={0}
         >
-          <div className="flex ml-8 mb-1">
-            {COLUMN_LABELS.map(label => (
-              <div key={label} className="w-full text-center text-xs text-ocean-400 font-mono" style={{ width: '2.5rem' }}>
-                {label}
+          <div className="perspective-board">
+            <div className="board-3d">
+              <div className="flex ml-8 mb-1">
+                {COLUMN_LABELS.map(label => (
+                  <div key={label} className="w-full text-center text-xs text-ocean-400/80 font-mono" style={{ width: '2.5rem' }}>
+                    {label}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="flex">
-            <div className="flex flex-col mr-1">
-              {ROW_LABELS.map(label => (
-                <div key={label} className="flex items-center justify-end pr-1 text-xs text-ocean-400 font-mono w-7" style={{ height: '2.5rem' }}>
-                  {label}
+              <div className="flex">
+                <div className="flex flex-col mr-1">
+                  {ROW_LABELS.map(label => (
+                    <div key={label} className="flex items-center justify-end pr-1 text-xs text-ocean-400/80 font-mono w-7" style={{ height: '2.5rem' }}>
+                      {label}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div
-              className="grid gap-[2px] p-1 rounded-lg bg-ocean-900/80 border border-ocean-600/20"
-              style={{ gridTemplateColumns: 'repeat(10, 2.5rem)', gridTemplateRows: 'repeat(10, 2.5rem)' }}
-            >
-              {grid.map((row, y) =>
-                row.map((cell, x) => {
-                  const isHovering = hoverCells.some(c => c.x === x && c.y === y);
-                  let bgClass = 'bg-ocean-700/50';
-                  if (cell.hasShip && cell.shipName) {
-                    bgClass = SHIP_COLORS[cell.shipName];
-                  }
-                  if (isHovering) {
-                    bgClass = isValid
-                      ? 'bg-neon-green/30 ring-1 ring-neon-green/50'
-                      : 'bg-neon-red/30 ring-1 ring-neon-red/50';
-                  }
+                <div className="relative">
+                  <div
+                    className="grid gap-[2px] p-1.5 rounded-lg board-frame water-shimmer"
+                    style={{ gridTemplateColumns: 'repeat(10, 2.5rem)', gridTemplateRows: 'repeat(10, 2.5rem)' }}
+                  >
+                    {grid.map((row, y) =>
+                      row.map((cell, x) => {
+                        const isHovering = hoverCells.some(c => c.x === x && c.y === y);
+                        let bgClass = 'bg-ocean-700/40 cell-3d-water';
+                        let depthClass = 'cell-3d';
+                        if (cell.hasShip && cell.shipName) {
+                          bgClass = SHIP_COLORS[cell.shipName];
+                          depthClass = 'cell-3d-ship';
+                        }
+                        if (isHovering) {
+                          depthClass = 'cell-3d';
+                          bgClass = isValid
+                            ? 'bg-neon-green/25 ring-1 ring-neon-green/50 shadow-[0_0_12px_rgba(0,255,136,0.2)]'
+                            : 'bg-neon-red/25 ring-1 ring-neon-red/50 shadow-[0_0_12px_rgba(255,51,102,0.2)]';
+                        }
 
-                  return (
-                    <motion.button
-                      key={`${x}-${y}`}
-                      whileHover={!allPlaced ? { scale: 1.1, zIndex: 10 } : undefined}
-                      onClick={() => handleCellClick(x, y)}
-                      onMouseEnter={() => setHoverPos({ x, y })}
-                      onMouseLeave={() => setHoverPos(null)}
-                      disabled={allPlaced}
-                      className={`rounded-sm border border-ocean-600/30 transition-colors duration-100
-                        ${bgClass} ${!allPlaced ? 'cursor-crosshair' : 'cursor-default'}`}
-                    />
-                  );
-                })
-              )}
+                        return (
+                          <motion.button
+                            key={`${x}-${y}`}
+                            whileHover={!allPlaced ? { scale: 1.1, zIndex: 10 } : undefined}
+                            onClick={() => handleCellClick(x, y)}
+                            onMouseEnter={() => setHoverPos({ x, y })}
+                            onMouseLeave={() => setHoverPos(null)}
+                            disabled={allPlaced}
+                            className={`rounded-[3px] border border-ocean-600/20 transition-all duration-100
+                              ${depthClass} ${bgClass} ${!allPlaced ? 'cursor-crosshair' : 'cursor-default'}`}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* 3D Ship overlays */}
+                  {placements.length > 0 && (
+                    <div
+                      className="absolute pointer-events-none"
+                      style={{
+                        top: 6,
+                        left: 6,
+                        right: 6,
+                        bottom: 6,
+                        transformStyle: 'preserve-3d',
+                      }}
+                    >
+                      {placements.map(ship => (
+                        <Ship3D
+                          key={ship.name}
+                          placement={ship}
+                          cellSize={40}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -281,10 +322,22 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
                   ${placed ? 'border-neon-green/30 text-neon-green/70 bg-neon-green/5' :
                     active ? 'border-neon-blue/50 text-neon-blue bg-neon-blue/10' :
                     'border-ocean-600/30 text-ocean-500 bg-ocean-800/50'}`}
+                style={{
+                  boxShadow: placed
+                    ? '0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(0,255,136,0.1)'
+                    : active
+                    ? '0 2px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(0,212,255,0.1)'
+                    : '0 1px 2px rgba(0,0,0,0.2)'
+                }}
               >
                 <div className="flex gap-0.5">
                   {Array.from({ length: ship.length }).map((_, j) => (
-                    <div key={j} className={`w-3 h-3 rounded-sm ${placed ? 'bg-neon-green/40' : active ? SHIP_COLORS[ship.name] : 'bg-ocean-600/30'}`} />
+                    <div key={j}
+                      className={`w-3 h-3 rounded-sm ${placed ? 'bg-neon-green/40' : active ? SHIP_COLORS[ship.name] : 'bg-ocean-600/30'}`}
+                      style={{
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 1px 2px rgba(0,0,0,0.3)'
+                      }}
+                    />
                   ))}
                 </div>
                 <span>{SHIP_LABELS[ship.name]}</span>
@@ -301,12 +354,15 @@ export function ShipPlacement({ onConfirm, waitingForOpponent }: ShipPlacementPr
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              whileHover={{ scale: 1.05, boxShadow: '0 0 40px rgba(0, 255, 136, 0.3)' }}
+              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onConfirm(placements)}
-              className="px-8 py-3 bg-gradient-to-r from-neon-green/20 to-neon-blue/20 rounded-xl
+              className="px-8 py-3 bg-gradient-to-b from-neon-green/20 to-neon-blue/10 rounded-xl
                 border border-neon-green/40 text-white font-display text-lg tracking-wider
-                hover:border-neon-green/70 transition-all duration-300"
+                hover:border-neon-green/70 transition-all duration-300 btn-3d"
+              style={{
+                textShadow: '0 0 10px rgba(0,255,136,0.4)',
+              }}
             >
               CONFIRM DEPLOYMENT
             </motion.button>
