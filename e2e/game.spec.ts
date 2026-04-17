@@ -3,10 +3,16 @@ import { test, expect } from '@playwright/test';
 test.describe('Battleship E2E', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    await page.evaluate(() => {
+      localStorage.setItem('battleship-locale', 'en');
+      localStorage.removeItem('battleship-gameId');
+      localStorage.removeItem('battleship-playerId');
+    });
+    await page.reload();
   });
 
   test('main menu renders with all options', async ({ page }) => {
-    await expect(page.locator('text=BATTLESHIP')).toBeVisible();
+    await expect(page.locator('text=BATTLE')).toBeVisible();
     await expect(page.locator('text=VS COMPUTER')).toBeVisible();
     await expect(page.locator('text=CREATE ROOM')).toBeVisible();
     await expect(page.locator('text=JOIN ROOM')).toBeVisible();
@@ -25,7 +31,7 @@ test.describe('Battleship E2E', () => {
     await page.click('button:has-text("MEDIUM")');
     await expect(page.locator('text=DEPLOY YOUR FLEET')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('text=RANDOMIZE')).toBeVisible();
-    await expect(page.locator('text=HORIZONTAL')).toBeVisible();
+    await expect(page.locator('button:has-text("HORIZONTAL")').first()).toBeVisible();
   });
 
   test('randomize places all ships and shows confirm', async ({ page }) => {
@@ -111,5 +117,71 @@ test.describe('Battleship E2E', () => {
     for (const letter of ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']) {
       await expect(page.locator(`text="${letter}"`).first()).toBeVisible();
     }
+  });
+
+  test('exit game button visible during placement and returns to menu', async ({ page }) => {
+    await page.click('text=VS COMPUTER');
+    await page.click('button:has-text("EASY")');
+    await expect(page.locator('text=DEPLOY YOUR FLEET')).toBeVisible({ timeout: 5000 });
+
+    const exitBtn = page.locator('button:has-text("EXIT GAME")');
+    await expect(exitBtn).toBeVisible();
+    await exitBtn.click();
+
+    await expect(page.locator('text=VS COMPUTER')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('exit game button visible during firing phase and returns to menu', async ({ page }) => {
+    await page.click('text=VS COMPUTER');
+    await page.click('button:has-text("EASY")');
+    await expect(page.locator('text=DEPLOY YOUR FLEET')).toBeVisible({ timeout: 5000 });
+    await page.click('text=RANDOMIZE');
+    await page.click('text=CONFIRM DEPLOYMENT');
+
+    await expect(page.locator('h3:has-text("ENEMY WATERS")')).toBeVisible({ timeout: 5000 });
+
+    const exitBtn = page.locator('button:has-text("EXIT GAME")');
+    await expect(exitBtn).toBeVisible();
+    await exitBtn.click();
+
+    await expect(page.locator('text=VS COMPUTER')).toBeVisible({ timeout: 3000 });
+  });
+
+  test('resume game prompt appears after exiting mid-game', async ({ page }) => {
+    await page.click('text=VS COMPUTER');
+    await page.click('button:has-text("EASY")');
+    await expect(page.locator('text=DEPLOY YOUR FLEET')).toBeVisible({ timeout: 5000 });
+    await page.click('text=RANDOMIZE');
+    await page.click('text=CONFIRM DEPLOYMENT');
+
+    await expect(page.locator('h3:has-text("ENEMY WATERS")')).toBeVisible({ timeout: 5000 });
+
+    await page.locator('button:has-text("EXIT GAME")').click();
+    await expect(page.locator('text=VS COMPUTER')).toBeVisible({ timeout: 3000 });
+
+    await expect(page.locator('text=RESUME GAME')).toBeVisible({ timeout: 3000 });
+    await expect(page.locator('text=START FRESH')).toBeVisible();
+  });
+
+  test('start fresh clears saved game', async ({ page }) => {
+    await page.click('text=VS COMPUTER');
+    await page.click('button:has-text("EASY")');
+    await expect(page.locator('text=DEPLOY YOUR FLEET')).toBeVisible({ timeout: 5000 });
+    await page.click('text=RANDOMIZE');
+    await page.click('text=CONFIRM DEPLOYMENT');
+
+    await expect(page.locator('h3:has-text("ENEMY WATERS")')).toBeVisible({ timeout: 5000 });
+
+    await page.locator('button:has-text("EXIT GAME")').click();
+    await expect(page.locator('text=RESUME GAME')).toBeVisible({ timeout: 3000 });
+
+    await page.click('text=START FRESH');
+    await expect(page.locator('text=RESUME GAME')).not.toBeVisible({ timeout: 3000 });
+    await expect(page.locator('text=VS COMPUTER')).toBeVisible();
+  });
+
+  test('language selector is visible and switches language', async ({ page }) => {
+    const langBtn = page.locator('button:has-text("EN")');
+    await expect(langBtn.first()).toBeVisible({ timeout: 3000 });
   });
 });

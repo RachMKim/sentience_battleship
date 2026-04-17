@@ -174,6 +174,7 @@ io.on('connection', (socket) => {
       const clientState = gameManager.getClientState(data.gameId, playerId);
       if (!clientState) { callback({ error: 'Player not in this game' }); return; }
       callback({ state: clientState, gameId: data.gameId });
+      socket.to(data.gameId).emit('opponent-reconnected');
     } catch (err) {
       console.error('rejoin-game error:', err);
       if (typeof callback === 'function') callback({ error: 'Server error' });

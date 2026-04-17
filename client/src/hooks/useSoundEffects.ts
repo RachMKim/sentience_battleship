@@ -1,73 +1,43 @@
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
 
-function createOscillator(
-  ctx: AudioContext,
-  type: OscillatorType,
-  freq: number,
-  duration: number,
-  gain: number
-) {
-  const osc = ctx.createOscillator();
-  const g = ctx.createGain();
+let ctx: AudioContext | null = null;
+
+function getCtx(): AudioContext {
+  if (!ctx) ctx = new AudioContext();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+function beep(freq: number, duration: number, vol = 0.06, type: OscillatorType = 'sine') {
+  const c = getCtx();
+  const t = c.currentTime;
+  const osc = c.createOscillator();
+  const gain = c.createGain();
   osc.type = type;
   osc.frequency.value = freq;
-  g.gain.setValueAtTime(gain, ctx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
-  osc.connect(g);
-  g.connect(ctx.destination);
-  osc.start();
-  osc.stop(ctx.currentTime + duration);
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+  osc.connect(gain).connect(c.destination);
+  osc.start(t);
+  osc.stop(t + duration);
 }
 
 export function useSoundEffects() {
-  const ctxRef = useRef<AudioContext | null>(null);
-
-  const getCtx = useCallback(() => {
-    if (!ctxRef.current) {
-      ctxRef.current = new AudioContext();
-    }
-    if (ctxRef.current.state === 'suspended') {
-      ctxRef.current.resume();
-    }
-    return ctxRef.current;
-  }, []);
-
-  const playHit = useCallback(() => {
-    const ctx = getCtx();
-    createOscillator(ctx, 'sawtooth', 200, 0.3, 0.15);
-    createOscillator(ctx, 'square', 100, 0.4, 0.1);
-    setTimeout(() => createOscillator(ctx, 'sawtooth', 80, 0.2, 0.12), 100);
-  }, [getCtx]);
-
-  const playMiss = useCallback(() => {
-    const ctx = getCtx();
-    createOscillator(ctx, 'sine', 400, 0.15, 0.08);
-    setTimeout(() => createOscillator(ctx, 'sine', 300, 0.15, 0.05), 80);
-  }, [getCtx]);
-
+  const playHit = useCallback(() => beep(200, 0.15, 0.07), []);
+  const playMiss = useCallback(() => beep(600, 0.1, 0.04), []);
   const playSunk = useCallback(() => {
-    const ctx = getCtx();
-    createOscillator(ctx, 'sawtooth', 150, 0.5, 0.2);
-    createOscillator(ctx, 'square', 75, 0.6, 0.15);
-    setTimeout(() => {
-      createOscillator(ctx, 'sawtooth', 100, 0.4, 0.15);
-      createOscillator(ctx, 'square', 50, 0.5, 0.1);
-    }, 200);
-  }, [getCtx]);
-
-  const playPlace = useCallback(() => {
-    const ctx = getCtx();
-    createOscillator(ctx, 'sine', 600, 0.1, 0.06);
-    setTimeout(() => createOscillator(ctx, 'sine', 800, 0.1, 0.06), 60);
-  }, [getCtx]);
-
+    beep(160, 0.2, 0.08);
+    setTimeout(() => beep(110, 0.25, 0.06), 150);
+  }, []);
+  const playPlace = useCallback(() => beep(500, 0.06, 0.04, 'triangle'), []);
   const playVictory = useCallback(() => {
-    const ctx = getCtx();
-    const notes = [523, 659, 784, 1047];
-    notes.forEach((freq, i) => {
-      setTimeout(() => createOscillator(ctx, 'sine', freq, 0.3, 0.1), i * 150);
-    });
-  }, [getCtx]);
+    // C E G C (major chord arpeggio)
+    beep(523, 0.2, 0.06, 'triangle');
+    setTimeout(() => beep(659, 0.2, 0.06, 'triangle'), 150);
+    setTimeout(() => beep(784, 0.2, 0.06, 'triangle'), 300);
+    setTimeout(() => beep(1047, 0.3, 0.07, 'triangle'), 450);
+  }, []);
+  const playTargetPing = useCallback(() => beep(900, 0.03, 0.03), []);
 
-  return { playHit, playMiss, playSunk, playPlace, playVictory };
+  return { playHit, playMiss, playSunk, playPlace, playVictory, playTargetPing };
 }

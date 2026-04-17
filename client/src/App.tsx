@@ -8,14 +8,26 @@ import { FiringPhase } from './components/FiringPhase';
 import { GameOver } from './components/GameOver';
 import { GameHistory } from './components/GameHistory';
 import { WaitingRoom } from './components/WaitingRoom';
+import { LanguageSelector } from './components/LanguageSelector';
+import { useI18n } from './lib/i18n';
 import type { AIDifficulty } from './lib/types';
 
 type Screen = 'menu' | 'game' | 'history';
 
 function App() {
+  const { t } = useI18n();
   const { socket, connected } = useSocket();
-  const { gameState, gameId, lastShot, opponentDisconnected, error, createGame, joinGame, placeShips, fireShot, resetGame, setLastShot, setError } = useGame(socket);
+  const {
+    gameState, gameId, lastShot, opponentDisconnected, error, hasSavedGame,
+    createGame, joinGame, placeShips, fireShot, resumeGame, pauseGame, clearSavedGame, resetGame, setLastShot, setError,
+  } = useGame(socket);
   const [screen, setScreen] = useState<Screen>('menu');
+
+  useEffect(() => {
+    if (gameState && screen === 'menu') {
+      setScreen('game');
+    }
+  }, [gameState, screen]);
 
   useEffect(() => {
     if (error) {
@@ -44,6 +56,19 @@ function App() {
     },
     [joinGame]
   );
+
+  const handleResume = useCallback(() => {
+    resumeGame();
+  }, [resumeGame]);
+
+  const handleStartFresh = useCallback(() => {
+    clearSavedGame();
+  }, [clearSavedGame]);
+
+  const handleQuit = useCallback(() => {
+    pauseGame();
+    setScreen('menu');
+  }, [pauseGame]);
 
   const handleMenu = useCallback(() => {
     resetGame();
@@ -78,19 +103,28 @@ function App() {
   );
 
   if (screen === 'history') {
-    return <GameHistory onBack={() => setScreen('menu')} />;
+    return (
+      <>
+        <LanguageSelector />
+        <GameHistory onBack={() => setScreen('menu')} />
+      </>
+    );
   }
 
   if (screen === 'menu' || !gameState) {
     return (
       <>
+        <LanguageSelector />
         {errorToast}
         <Menu
           onStartAI={handleStartAI}
           onCreateMultiplayer={handleCreateMultiplayer}
           onJoinMultiplayer={handleJoinMultiplayer}
           onViewHistory={() => setScreen('history')}
+          onResume={handleResume}
+          onStartFresh={handleStartFresh}
           connected={connected}
+          hasSavedGame={hasSavedGame && !gameState}
         />
       </>
     );
@@ -108,8 +142,8 @@ function App() {
 
   return (
     <div className="relative">
+      <LanguageSelector />
       {errorToast}
-      {/* Opponent disconnected banner */}
       <AnimatePresence>
         {opponentDisconnected && gameState.phase !== 'finished' && (
           <motion.div
@@ -118,12 +152,12 @@ function App() {
             exit={{ opacity: 0, y: -50 }}
             className="fixed top-0 left-0 right-0 z-50 bg-neon-red/20 border-b border-neon-red/30 py-3 text-center flex items-center justify-center gap-4"
           >
-            <span className="text-neon-red text-sm font-display tracking-wider">OPPONENT DISCONNECTED</span>
+            <span className="text-neon-red text-sm font-display tracking-wider">{t('opponent_disconnected')}</span>
             <button
               onClick={handleMenu}
               className="px-3 py-1 text-xs font-display tracking-wider rounded-lg border border-neon-red/40 text-white bg-neon-red/10 hover:bg-neon-red/20 transition-colors"
             >
-              RETURN TO MENU
+              {t('return_to_menu')}
             </button>
           </motion.div>
         )}
@@ -139,6 +173,7 @@ function App() {
                 gameState.myShips.length > 0 &&
                 gameState.phase === 'placement'
               }
+              onQuit={handleQuit}
             />
           </motion.div>
         )}
@@ -150,6 +185,7 @@ function App() {
               onFire={fireShot}
               lastShot={lastShot}
               onClearShot={() => setLastShot(null)}
+              onQuit={handleQuit}
             />
           </motion.div>
         )}

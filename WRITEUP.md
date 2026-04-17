@@ -3,6 +3,7 @@
 ## Table of Contents
 - [Tech Stack](#tech-stack)
 - [Architecture Overview](#architecture-overview)
+- [Game Flow](#game-flow)
 - [Requirements Checklist](#requirements-checklist)
 - [Technical Decisions & Trade-offs](#technical-decisions--trade-offs)
 - [Anti-Cheat: Attack Vectors & Defenses](#anti-cheat-attack-vectors--defenses)
@@ -19,6 +20,9 @@
 |-------|-----------|-----|
 | Frontend | React 19, TypeScript, Vite | Type safety, fast HMR, modern React features |
 | Styling | Tailwind CSS v4, Framer Motion | Utility-first CSS for rapid iteration; physics-based animations |
+| Ship Visuals | Custom SVG rendering (`ShipSVG.tsx`) | Per-ship silhouettes with turrets, bridges, flight decks — vector-based, no image assets |
+| Sound Effects | ZzFX (game audio synth library) | 1KB library with 20-parameter sound synthesis — bomb impacts, water splashes, sinking sequences |
+| i18n | Custom React Context + translations | 5 languages (EN, ES, KO, JA, ZH), auto-detects browser locale, persisted to localStorage |
 | Real-time | Socket.IO | WebSocket abstraction with fallback to polling, rooms, ack callbacks |
 | Backend | Express, Node.js, TypeScript | Lightweight HTTP + WebSocket server, shared types with client |
 | Database | Prisma ORM + SQLite | Type-safe queries, auto-migrations, zero-infrastructure persistence |
@@ -29,41 +33,127 @@
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────┐
-│          React Client           │
-│  Menu → Placement → Firing →    │
-│  GameOver / History             │
-│  Socket.IO client               │
-└────────────┬────────────────────┘
-             │ WebSocket + HTTP
-┌────────────▼────────────────────┐
-│         Express Server          │
-│  Socket.IO event handlers       │
-│  Input validation layer         │
-│  ┌───────────────────────────┐  │
-│  │     GameManager           │  │
-│  │  - Game state (in-memory) │  │
-│  │  - Shot processing        │  │
-│  │  - Turn management        │  │
-│  │  - Fleet validation       │  │
-│  │  - AI strategy engine     │  │
-│  │  - Stale game cleanup     │  │
-│  └───────────┬───────────────┘  │
-│              │                  │
-│  ┌───────────▼───────────────┐  │
-│  │   Prisma + SQLite         │  │
-│  │  - Game state snapshots   │  │
-│  │  - Move-by-move history   │  │
-│  │  - Crash recovery         │  │
-│  └───────────────────────────┘  │
-│                                 │
-│  REST: GET /api/games           │
-│  REST: GET /api/games/:id       │
-└─────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph Client ["React Client (Vite)"]
+        UI[UI Components]
+        I18N[i18n Context]
+        SFX[ZzFX Sound Engine]
+        SOCK_C[Socket.IO Client]
+        LS[localStorage<br/>gameId + playerId + locale]
+    end
+
+    subgraph Server ["Express + Socket.IO Server"]
+        SOCK_S[Socket.IO Server]
+        GM[GameManager]
+        AI[AIPlayer<br/>Easy / Medium / Hard]
+        VAL[Input Validation Layer]
+        HIST[History REST API]
+    end
+
+    subgraph DB ["Prisma + SQLite"]
+        GAMES[Games Table]
+        MOVES[Moves Table]
+    end
+
+    UI --> SOCK_C
+    SOCK_C -->|WebSocket| SOCK_S
+    SOCK_S --> VAL
+    VAL --> GM
+    GM --> AI
+    GM --> GAMES
+    GM --> MOVES
+    HIST --> GAMES
+    HIST --> MOVES
+    I18N --> UI
+    SFX --> UI
+    LS --> SOCK_C
 ```
 
 **Server-authoritative model**: The server owns all game state. The client is a pure rendering layer that receives projections of the game state — your own board (full visibility) and the opponent's board (only discovered hit/miss cells). Ship positions are never sent to the client until revealed through gameplay. All validation (placement, shots, turns) happens server-side.
+
+---
+
+## Game Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Menu
+    Menu --> DifficultySelect: VS COMPUTER
+    Menu --> WaitingRoom: CREATE ROOM
+    Menu --> JoinRoom: JOIN ROOM
+    Menu --> GameHistory: GAME HISTORY
+
+    DifficultySelect --> Placement: Select Easy/Medium/Hard
+    WaitingRoom --> Placement: Opponent Joins
+    JoinRoom --> Placement: Valid Code
+
+    state Placement {
+        [*] --> SelectShip
+        SelectShip --> PlaceOnBoard: Click or Drag
+        PlaceOnBoard --> SelectShip: More ships
+        PlaceOnBoard --> AllPlaced: 5 ships placed
+        AllPlaced --> [*]: CONFIRM DEPLOYMENT
+    }
+
+    Placement --> Firing: Both Players Deployed
+
+    state Firing {
+        [*] --> YourTurn
+        YourTurn --> EnemyTurn: Fire Shot
+        EnemyTurn --> YourTurn: Opponent Fires
+        YourTurn --> [*]: All enemy ships sunk
+        EnemyTurn --> [*]: All your ships sunk
+    }
+
+    Firing --> GameOver: Win/Loss Detected
+    GameOver --> Menu: MAIN MENU
+    GameOver --> Placement: REMATCH (AI only)
+
+    Menu --> Reconnect: Page Refresh (saved game)
+    Reconnect --> Firing: rejoin-game
+    Reconnect --> Menu: Game not found
+```
+
+### Socket Event Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant S as Server
+    participant DB as Database
+
+    C->>S: create-game {mode, difficulty}
+    S->>DB: persistGame()
+    S-->>C: {gameId, state}
+
+    C->>S: place-ships {gameId, placements[]}
+    S->>S: isValidFleet() + placeShip()
+    S->>DB: persistGame()
+    S-->>C: game-update (placement → firing)
+
+    loop Firing Phase
+        C->>S: fire {gameId, x, y}
+        S->>S: fireShot() + turn validation
+        S->>DB: recordMove()
+        S-->>C: {result: hit/miss/sunk}
+        S-->>C: game-update (new board state)
+
+        alt AI Mode
+            S->>S: AIPlayer.getNextShot()
+            S->>DB: recordMove()
+            S-->>C: ai-shot {result}
+            S-->>C: game-update
+        end
+    end
+
+    Note over C,S: On page refresh
+    C->>S: rejoin-game {gameId, oldPlayerId}
+    S->>DB: restoreGame() if not in memory
+    S->>S: remapPlayer(old → new socket ID)
+    S-->>C: {state, gameId}
+    S-->>C: opponent-reconnected (to other player)
+```
 
 ---
 
@@ -74,39 +164,45 @@
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
 | Complete, rules-correct Battleship | **Done** | 10×10 grid, 5 ships (Carrier-5, Battleship-4, Cruiser-3, Submarine-3, Destroyer-2), turn-based firing, hit/miss/sunk, win detection. All logic in `GameManager.ts` and `Board.ts`. |
-| Ship placement with rotate + validate | **Done** | Client: click-to-place with hover preview (green=valid, red=invalid), R key or button to rotate, undo last ship, randomize all. Server: validates exact fleet composition, no overlaps, within bounds. |
-| Firing phase with both boards visible | **Done** | "ENEMY WATERS" (opponent grid, click to fire) + "YOUR FLEET" (your board with colored ship cells and incoming hits). Blue targeting reticle on hover. All 10 rows fully interactive. |
-| Hit/miss/sunk feedback after every shot | **Done** | Animated toast notification (HIT! / MISS / [Ship] SUNK!), procedural sound effects via Web Audio API, visual markers on the grid (red ✕ for hit, blue dot for miss). |
-| Win detection + rematch/menu | **Done** | VICTORY/DEFEAT screen with animated glow, REMATCH button (restarts with same difficulty for AI), MAIN MENU button. |
+| Ship placement with rotate + validate | **Done** | Click-to-place with hover preview, drag-and-drop from fleet panel to board, R key or button to rotate, free ship selection (any order), randomize, clear all. Server validates exact fleet composition, no overlaps, within bounds. |
+| Firing phase with both boards visible | **Done** | "ENEMY WATERS" (opponent grid, click to fire) + "YOUR FLEET" (your board with SVG ship silhouettes and incoming hits). Targeting reticle on hover. All 10 rows fully interactive. |
+| Hit/miss/sunk feedback | **Done** | Animated notification banner (DIRECT HIT! / MISS / [Ship] SUNK!), ZzFX sound effects (bomb explosion on hit, water splash on miss, multi-layer sinking sequence on sunk), CSS fire/smoke/ember animations on the board, SVG ship silhouettes revealed for sunk enemy ships. |
+| Win detection + rematch/menu | **Done** | VICTORY/DEFEAT screen with animated glow + victory fanfare, REMATCH button (restarts with same difficulty for AI), MAIN MENU button. |
 
 ### Game Modes
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
 | vs. AI (single-player) | **Done** | 3 difficulty levels: Easy (random), Medium (hunt/target with checkerboard pattern), Hard (probability density analysis). AI ships placed randomly with retry logic ensuring complete fleet. |
-| AI "at least moderately intelligent" | **Done** | Medium mode uses hunt/target with adjacent cell probing after hits. Hard mode uses probability density — the same algorithm used by competitive Battleship solvers. |
-| vs. Human (multiplayer, real-time) | **Done** | CREATE ROOM generates a shareable code. JOIN ROOM with code. Socket.IO broadcasts game-update to both players on every action. No refresh needed. |
+| AI "at least moderately intelligent" | **Done** | Medium mode uses hunt/target with adjacent cell probing after hits. Hard mode uses probability density — the same algorithm used by competitive Battleship solvers. See [Spike section](#spike-ai-strategy-engine). |
+| vs. Human (multiplayer, real-time) | **Done** | CREATE ROOM generates a shareable code. JOIN ROOM with code. Socket.IO broadcasts game-update to both players on every action. |
 
 ### Hosting
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| Deployed to public URL | **Done** | https://sentience-battleship.onrender.com/ — Render free tier, auto-deploys from GitHub on push. |
-| GitHub repository | **Done** | Full monorepo with client/, server/, shared types, tests, CI-ready scripts. |
+| Deployed to public URL | **Done** | https://sentience-battleship.onrender.com/ — Render free tier, auto-deploys from GitHub. |
+| GitHub repository | **Done** | Full monorepo with client/, server/, shared types, tests. |
 
 ### Persistence
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| Game state survives page refresh | **Done** | `localStorage` stores gameId + playerId. On reconnect, client emits `rejoin-game`. Server restores from Prisma if not in memory, remaps old socket ID to new. AI state reconstructed from board state on server restart. |
+| Game state survives page refresh | **Done** | `localStorage` stores gameId + playerId. On reconnect, client emits `rejoin-game`. Server restores from Prisma if not in memory, remaps old socket ID to new. AI state reconstructed from board state. Opponent notified via `opponent-reconnected` event (clears disconnect banner). |
 | Completed game history stored + queryable | **Done** | Every move persisted with player, coordinates, result, timestamp. `GET /api/games` lists finished games. `GET /api/games/:id` returns full move sequence. UI has "BATTLE LOG" with click-through to move-by-move replay. |
+
+### Internationalization
+
+| Requirement | Status | Implementation |
+|-------------|--------|----------------|
+| Language-agnostic UI | **Done** | 5 languages: English, Spanish (Español), Korean (한국어), Japanese (日本語), Chinese (中文). Custom i18n system via React Context. Auto-detects browser locale, persists choice to localStorage. All user-facing strings use `t()` translation function. Language selector visible on every screen. |
 
 ### Considerations
 
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
-| How can a player cheat? | **Done** | See [Anti-Cheat section](#anti-cheat-attack-vectors--defenses) below — 6 attack vectors identified with corresponding defenses. |
-| Runtime complexity at scale | **Done** | See [Scalability section](#scalability-analysis) below — analysis of board size, concurrent games, and database scaling. |
+| How can a player cheat? | **Done** | See [Anti-Cheat section](#anti-cheat-attack-vectors--defenses) — 6 attack vectors identified with corresponding defenses. |
+| Runtime complexity at scale | **Done** | See [Scalability section](#scalability-analysis) — analysis of board size, concurrent games, and database scaling. |
 
 ### Testing
 
@@ -114,6 +210,17 @@
 |-------------|--------|----------------|
 | Unit tests | **Done** | 79 tests across Board, AIPlayer, GameManager covering placement, shooting, turn management, AI behavior, win conditions, edge cases, input validation. |
 | E2E tests | **Done** | 9 Playwright tests covering menu rendering, AI game flow, ship placement, firing on all rows (including row 10), no 3D transforms in DOM, game history, board labels. |
+
+### UI/UX Polish
+
+| Feature | Implementation |
+|---------|----------------|
+| SVG Ship Silhouettes | Custom vector ships with per-type details (turrets, bridges, flight decks, periscopes). Color-coded per ship type with glow effects. |
+| Drag-and-Drop Placement | Drag ships from fleet panel to board, drag placed ships to reposition. Hover feedback for valid/invalid cells. |
+| Animated Effects | CSS fire/smoke on hit cells, water splash ripples on misses, glowing embers on sunk ships. Framer Motion for transitions. |
+| Sound Effects | ZzFX synthesized audio — bomb impact on hit, water splash on miss, multi-stage sinking sequence (explosion + metal groan + water rush). |
+| Mobile Responsive | Adaptive cell sizing (28px on mobile, 36px on desktop), responsive flex layouts, touch-friendly controls. |
+| Accessibility | `prefers-reduced-motion` support, `aria-label` on grid cells, AudioContext auto-resume for browser autoplay policies. |
 
 ---
 
@@ -125,9 +232,9 @@
 
 **Rationale**: For a single-server deployment with low concurrent write volume, SQLite provides the persistence guarantees needed (game history, crash recovery) with zero infrastructure overhead. The database is a single file that ships with the server.
 
-**Trade-off**: SQLite on Render's ephemeral filesystem means data is lost on redeploy. For a production system, I would:
-1. Use Render's persistent disk and point `DATABASE_URL` at it, or
-2. Swap to PostgreSQL (one-line change in `schema.prisma`) with a managed database.
+**Trade-off**: SQLite on Render's ephemeral filesystem means data is lost on redeploy. For production:
+1. Use Render's persistent disk, or
+2. Swap to PostgreSQL (one-line change in `schema.prisma`).
 
 Prisma makes this swap trivial because the ORM abstracts the driver.
 
@@ -139,27 +246,37 @@ Prisma makes this swap trivial because the ORM abstracts the driver.
 
 **Trade-off**: Larger client bundle (~50KB gzipped) vs raw WS. Acceptable for this use case.
 
-### Why in-memory game state + DB backup (not DB-primary)?
+### Why in-memory state + DB backup (not DB-primary)?
 
 **Decision**: Active games live in a `Map<string, GameState>` in server memory. Prisma persists snapshots asynchronously.
 
-**Rationale**: Battleship has rapid state transitions (multiple shots per second in AI games). Writing to SQLite on every shot is fine for persistence, but reading from DB on every state query would add unnecessary latency. In-memory state gives O(1) access for active games.
+**Rationale**: Battleship has rapid state transitions (multiple shots per second in AI games). In-memory state gives O(1) access for active games.
 
-**Trade-off**: Server restart loses in-memory state. Mitigated by DB-backed `restoreGame()` which reconstructs both game state and AI targeting state from the persisted board. Not suitable for multi-server horizontal scaling without moving state to Redis.
+**Trade-off**: Server restart loses in-memory state. Mitigated by DB-backed `restoreGame()` which reconstructs game state and AI targeting state from the persisted board. Not suitable for multi-server horizontal scaling without Redis.
 
-### Why flat CSS over 3D transforms?
+### Why SVG ships over CSS/images?
 
-**Decision**: Ship visuals rendered as inline colored cells with per-ship hues and rounded endpoints. No CSS 3D perspective transforms.
+**Decision**: Custom SVG components rendered at runtime with per-ship hull paths, details (turrets, bridges, flight decks), and color themes.
 
-**Rationale**: Initial implementation used `rotateX()` perspective tilts and absolute-positioned ship overlays with `preserve-3d`. This caused persistent click-target failures: the `water-shimmer::after` pseudo-element and ship overlays intercepted pointer events on lower rows, and `justify-center` on the layout pushed the bottom of the board below the viewport fold. After multiple fix attempts, the 3D approach was abandoned in favor of a flat layout that is 100% clickable on all rows, all browsers, all viewport sizes.
+**Rationale**: Initial implementation used CSS 3D transforms with `rotateX()` perspective tilts. This caused click-target failures on lower grid rows due to overlay pointer-event interception. SVG with `pointer-events: none` as an overlay solves this completely while providing detailed ship visuals that scale to any cell size.
 
-**Trade-off**: Slightly less visually dramatic. The ship cells still use distinct per-ship colors (purple carrier, blue battleship, teal cruiser, green submarine, yellow destroyer), rounded endpoints, sunk states, and subtle shadows — preserving a premium feel without the interactivity cost.
+**Trade-off**: More complex component code than simple CSS shapes. The visual quality and interactivity gain justify it.
 
-### Why procedural audio over sound files?
+### Why ZzFX over audio files?
 
-**Decision**: Web Audio API oscillators generate all sound effects at runtime.
+**Decision**: ZzFX (1KB game audio synth library) for all sound effects.
 
-**Rationale**: Zero external audio assets to load, cache, or host. Sounds are generated in <1ms. Different timbres for different events (sine wave for miss, sawtooth for hit, victory melody). No CORS or loading-state issues.
+**Rationale**: ZzFX provides 20-parameter sound synthesis specifically designed for game audio — producing realistic explosions, splashes, and impacts with zero external audio files to load, host, or deal with CORS/caching issues. Sounds are instant and procedurally generated.
+
+**Trade-off**: Sounds are synthesized, not recorded. For this use case, the game-genre aesthetic fits well.
+
+### Why custom i18n over react-i18next?
+
+**Decision**: Lightweight custom i18n with React Context, ~200 lines.
+
+**Rationale**: The app has a bounded string set (~80 keys). A full i18n library (react-i18next + i18next + language detection plugins) adds 40KB+ to the bundle and significant configuration overhead. The custom solution provides the same UX (auto-detect locale, persist choice, `t()` function with interpolation) at a fraction of the cost.
+
+**Trade-off**: No pluralization rules, no ICU message format, no namespace splitting. These features are unnecessary for this scope.
 
 ---
 
@@ -167,15 +284,15 @@ Prisma makes this swap trivial because the ORM abstracts the driver.
 
 ### 1. Inspecting opponent's board
 
-**Attack**: Modified client reads ship positions from WebSocket messages or API responses.
+**Attack**: Modified client reads ship positions from WebSocket messages.
 
-**Defense**: `getVisibleBoard()` creates a projection where unhit cells show `hasShip: false` and `shipName: null`. Opponent ship health is sent only as sunk/not-sunk booleans (`opponentShipsSunk`), not exact HP. The history API excludes the raw `state` field via `select`.
+**Defense**: `getVisibleBoard()` creates a projection where unhit cells show `hasShip: false` and `shipName: null`. Opponent ship health is sent only as sunk/not-sunk booleans (`opponentShipsSunk`), not exact HP. The history API excludes the raw `state` field via Prisma `select`.
 
 ### 2. Sending an invalid fleet
 
-**Attack**: Modified client sends ships with wrong lengths (e.g., five Carriers), extra ships, or mismatched name/length pairs.
+**Attack**: Modified client sends ships with wrong lengths, extra ships, or mismatched name/length pairs.
 
-**Defense**: `isValidFleet()` validates: exactly 5 placements, each with a canonical ship name, correct length matching the name, valid orientation string (`'horizontal'` | `'vertical'`), integer coordinates within bounds, no duplicate names. Server also rebuilds the board from scratch and validates no overlaps via `placeShip()`.
+**Defense**: `isValidFleet()` validates: exactly 5 placements, each with a canonical ship name, correct length matching the name, valid orientation (`'horizontal'` | `'vertical'`), integer coordinates within bounds, no duplicate names. Server rebuilds the board from scratch and validates no overlaps via `placeShip()`.
 
 ### 3. Firing out of turn
 
@@ -185,21 +302,21 @@ Prisma makes this swap trivial because the ORM abstracts the driver.
 
 ### 4. Firing out of bounds or invalid coordinates
 
-**Attack**: Modified client sends `x: 999` or `x: "abc"` or `x: -1`.
+**Attack**: Modified client sends `x: 999` or `x: -1` or non-integer values.
 
-**Defense**: `fireShot()` validates `Number.isInteger(x)`, `Number.isInteger(y)`, and `0 <= x,y < BOARD_SIZE` before any grid access. The socket handler also validates `typeof data.x === 'number'`.
+**Defense**: `fireShot()` validates `Number.isInteger(x)`, `Number.isInteger(y)`, and `0 <= x,y < BOARD_SIZE` before grid access. The socket handler also validates `typeof data.x === 'number'`.
 
 ### 5. Crashing the server
 
-**Attack**: Client sends malformed payloads, missing callbacks, or floods events.
+**Attack**: Malformed payloads, missing callbacks, or event flooding.
 
-**Defense**: Every socket handler wraps logic in `try/catch`, validates `typeof callback === 'function'` before calling it, and validates `data` shape before processing. Errors are logged and the client receives a generic error response.
+**Defense**: Every socket handler wraps logic in `try/catch`, validates `typeof callback === 'function'`, and validates data shape before processing. Errors are logged and the client receives a generic error response.
 
 ### 6. Session hijacking via rejoin
 
 **Attack**: Attacker knows a gameId and oldPlayerId, sends `rejoin-game` to steal another player's seat.
 
-**Defense acknowledged**: The current implementation remaps player IDs on rejoin without session tokens. For a production system, a cryptographic session token stored in `localStorage` and validated server-side would prevent this. For this demo scope, the risk is accepted given the 8-character game IDs and ephemeral socket IDs.
+**Defense acknowledged**: The current implementation remaps player IDs on rejoin without session tokens. For production, a cryptographic session token stored in `localStorage` and validated server-side would prevent this. For this demo scope, the risk is accepted given ephemeral socket IDs and short-lived games.
 
 ---
 
@@ -232,24 +349,41 @@ For horizontal scaling: move game state to Redis with pub/sub for cross-server b
 
 ### Unit Tests (79 tests, Vitest)
 
-Server game logic tested comprehensively:
+```mermaid
+graph LR
+    subgraph Tests ["Server Test Suite (79 tests)"]
+        BT[Board.ts Tests]
+        AT[AIPlayer.ts Tests]
+        GT[GameManager.ts Tests]
+    end
 
-- **Board.ts** — Grid creation, ship placement validation (bounds, overlaps, edges), random fleet placement (completeness, no overlap, within bounds), shot processing (hit, miss, sunk, allSunk, duplicate, out-of-bounds), board visibility (owner vs opponent projections).
-- **AIPlayer.ts** — State initialization, shot generation for all 3 difficulties, bounds checking, no duplicate shots, nearly-full board handling, hunt/target mode transitions, adjacent cell targeting, sunk ship cleanup, checkerboard pattern verification.
-- **GameManager.ts** — Game creation (AI/multiplayer), joining (valid/rejected cases), fleet validation (incomplete, duplicate names, wrong lengths, out-of-bounds, non-integer coords, invalid orientation, double placement), shot firing (turn enforcement, bounds, duplicates), AI response, client state projection (hides ships, exposes sunk status), disconnect handling, full game simulation to completion.
+    BT -->|Grid creation| B1[Ship placement validation]
+    BT -->|Bounds, overlaps| B2[Shot processing]
+    BT -->|Hit, miss, sunk| B3[Board visibility projections]
+
+    AT -->|3 difficulties| A1[Shot generation]
+    AT -->|Hunt/target| A2[Mode transitions]
+    AT -->|Bounds| A3[No duplicate shots]
+
+    GT -->|Create/join| G1[Fleet validation]
+    GT -->|Turn enforcement| G2[Client state projection]
+    GT -->|Full simulation| G3[Game completion]
+```
+
+- **Board.ts** — Grid creation, ship placement validation (bounds, overlaps, edges), random fleet placement, shot processing (hit, miss, sunk, allSunk, duplicate, out-of-bounds), board visibility.
+- **AIPlayer.ts** — Shot generation for all 3 difficulties, bounds checking, no duplicate shots, hunt/target transitions, adjacent cell targeting, sunk ship cleanup, checkerboard pattern.
+- **GameManager.ts** — Game creation (AI/multiplayer), joining, fleet validation (incomplete, duplicate names, wrong lengths, out-of-bounds, non-integer coords, invalid orientation), shot firing (turn enforcement, bounds, duplicates), AI response, client state projection, disconnect handling, full game simulation.
 
 ### E2E Tests (9 tests, Playwright)
 
-Client flows tested against the running app:
-
-- Main menu renders with all options (VS COMPUTER, CREATE/JOIN ROOM, GAME HISTORY)
-- VS COMPUTER shows difficulty selection (EASY, MEDIUM, HARD)
+- Main menu renders with all options
+- VS COMPUTER shows difficulty selection
 - AI game reaches placement phase with correct UI
 - Randomize places all ships and shows CONFIRM button
 - Full AI game flow: placement → firing → shots register on all rows including row 10
 - No 3D perspective transforms exist in the DOM (regression test)
 - Game history page loads without crash
-- Board has 10 row labels (1-10) and column labels (A-J)
+- Board has row labels (1-10) and column labels (A-J)
 
 ### Running Tests
 
@@ -267,13 +401,40 @@ npx playwright test
 
 I chose the AI as my spike because competitive Battleship has well-studied optimal play, and implementing the algorithm hierarchy (random → hunt/target → probability density) demonstrates both algorithmic thinking and practical game design.
 
-**Three difficulty tiers**:
+### Three difficulty tiers
+
+```mermaid
+graph TB
+    subgraph Easy ["Easy: Uniform Random"]
+        E1[Pick random unshot cell]
+    end
+
+    subgraph Medium ["Medium: Hunt & Target"]
+        M1[Hunt Mode: Checkerboard pattern]
+        M2[Hit detected]
+        M3[Target Mode: Probe 4 adjacent cells]
+        M4[Ship sunk → clear queue]
+        M1 --> M2
+        M2 --> M3
+        M3 --> M4
+        M4 --> M1
+    end
+
+    subgraph Hard ["Hard: Probability Density"]
+        H1[For each remaining ship]
+        H2[Enumerate all valid placements]
+        H3[Score each cell = count of placements through it]
+        H4[Fire at highest-probability cell]
+        H1 --> H2 --> H3 --> H4
+        H4 -->|Target mode| H5[Combine density + hit adjacency]
+    end
+```
 
 | Level | Algorithm | Behavior |
 |-------|-----------|----------|
 | Easy | Uniform random | Picks any unshot cell. Feels fair for casual play. |
 | Medium | Hunt/Target | Checkerboard hunt pattern (skips cells that can't contain the smallest remaining ship). On hit, probes all 4 adjacent cells. On sunk, clears target queue, re-evaluates remaining hits. |
-| Hard | Probability density | For each remaining ship, enumerates every valid placement on the current board. Each unshot cell gets a score = number of possible placements passing through it. Fires at the highest-probability cell. In target mode, combines density analysis with hit adjacency for optimal follow-up. |
+| Hard | Probability density | For each remaining ship, enumerates every valid placement on the current board. Each unshot cell gets a score = number of possible placements passing through it. Fires at the highest-probability cell. In target mode, combines density with hit adjacency. |
 
 The Hard AI uses the same core algorithm as competitive Battleship solvers (Donald Knuth's approach). Runtime is O(S × N² × 2) per shot — trivial for 10×10 but the asymptotic analysis matters if the board scales.
 
@@ -285,15 +446,16 @@ I used **Cursor with Claude** as my primary development tool throughout this pro
 
 **Where AI excelled**:
 - **Scaffolding** — Project structure, Prisma schema, Express + Socket.IO boilerplate, Tailwind config. AI generated 80%+ of this correctly on first pass.
-- **Systematic auditing** — I had AI read every file in the codebase and report bugs, security gaps, edge cases, and UX issues. This identified issues I would have missed in manual review (e.g., the ship overlay intercepting grid clicks, silent fire errors in the client, `opponentShipHealth` leaking exact HP).
-- **Test generation** — AI generated comprehensive unit and e2e test suites, covering edge cases I specified and discovering additional boundary conditions.
-- **Component iteration** — Generated React components with Tailwind styling, then iterated on visual details through conversation.
+- **Systematic auditing** — AI read every file and reported bugs, security gaps, edge cases. This identified issues I would have missed (e.g., ship overlay intercepting grid clicks, `opponentShipHealth` leaking exact HP).
+- **Test generation** — Comprehensive unit and e2e test suites, covering edge cases and boundary conditions.
+- **i18n translations** — AI generated translations for 5 languages from the English source strings, which were then reviewed.
+- **SVG ship rendering** — AI generated the hull paths and detail elements for 5 ship types based on my visual direction.
 
 **Where I directed the work**:
-- **Architecture** — The server-authoritative design, the state projection model, and the anti-cheat strategy were deliberate choices I made and directed the AI to implement.
-- **AI algorithm design** — I chose the probability density approach based on competitive Battleship literature and guided the implementation through the three-tier difficulty system.
-- **UX decisions** — The targeting reticle hover effect, ship color scheme, and the sound design choices were my creative direction.
-- **Quality bar** — I drove the hardening pass that validated every socket event, added fleet composition checks, stripped leaked data from the API, and added memory cleanup. The AI executed, but I defined what "production-ready" meant.
-- **Bug diagnosis** — I identified the row 6+ click failures and directed the removal of 3D transforms as the root cause, after the AI attempted multiple partial fixes.
+- **Architecture** — The server-authoritative design, state projection model, and anti-cheat strategy were deliberate choices I made.
+- **AI algorithm design** — I chose the probability density approach based on competitive Battleship literature and guided the three-tier difficulty system.
+- **UX decisions** — The drag-and-drop placement, SVG ship aesthetic, sound design choices, and i18n approach were my creative direction.
+- **Quality bar** — I drove the hardening pass: socket event validation, fleet composition checks, data leak prevention, memory cleanup. The AI executed, but I defined "production-ready."
+- **Bug diagnosis** — I identified the row 6+ click failures and directed the removal of 3D transforms as the root cause.
 
 The collaboration was most productive when I treated AI as a fast executor that I directed with clear intent, rather than delegating entire decisions to it.

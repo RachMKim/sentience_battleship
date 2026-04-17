@@ -2,15 +2,21 @@
 
 A real-time multiplayer Battleship game with intelligent AI opponent, built with React, Socket.IO, and Prisma.
 
+**Live:** https://sentience-battleship.onrender.com/
+
 ## Features
 
 - **vs AI** — Three difficulty levels: Easy (random), Medium (hunt & target), Hard (probability density analysis)
-- **vs Human** — Real-time multiplayer via WebSocket rooms
-- **Ship Placement** — Click to place, R to rotate, randomize button, undo support
-- **Persistence** — Game state survives page refresh; completed games stored with full move history
+- **vs Human** — Real-time multiplayer via WebSocket rooms with shareable room codes
+- **Ship Placement** — Drag-and-drop or click to place, R to rotate, randomize, free ship selection
+- **SVG Ship Visuals** — Custom vector ship silhouettes with turrets, bridges, flight decks
+- **Sound Effects** — ZzFX synthesized game audio (bomb impacts, water splashes, sinking sequences)
+- **Animated Effects** — Fire/smoke on hits, water splash on misses, ember glow on sunk ships
+- **Persistence** — Game state survives page refresh via localStorage + server-side restore
 - **Anti-cheat** — Server-authoritative architecture; client never knows opponent ship positions
-- **Sound Effects** — Procedural audio via Web Audio API
-- **Animations** — Smooth transitions and feedback via Framer Motion
+- **i18n** — 5 languages: English, Español, 한국어, 日本語, 中文
+- **Mobile Responsive** — Adaptive grid sizing, responsive layouts, touch-friendly controls
+- **Accessibility** — `prefers-reduced-motion`, `aria-label` on grid cells, AudioContext auto-resume
 
 ## Quick Start
 
@@ -19,50 +25,64 @@ A real-time multiplayer Battleship game with intelligent AI opponent, built with
 npm run install:all
 
 # Set up the database
-npm run db:migrate --prefix server
+cd server && DATABASE_URL=file:./dev.db npx prisma migrate deploy && cd ..
 
-# Start development servers
+# Start development servers (client on :5173, server on :3001)
 npm run dev
 ```
 
-The client runs on `http://localhost:5173` and the server on port `3001`.
-
 ## Tech Stack
 
-- **Frontend:** React 19, Vite, Tailwind CSS, Framer Motion, Socket.IO Client
+- **Frontend:** React 19, Vite, Tailwind CSS v4, Framer Motion, ZzFX, Socket.IO Client
 - **Backend:** Express, Socket.IO, Prisma + SQLite
 - **Language:** TypeScript throughout
+- **Testing:** Vitest (79 unit tests), Playwright (9 e2e tests)
 
 ## Project Structure
 
 ```
 battleship/
-  client/           # React frontend
+  client/                # React frontend
     src/
-      components/   # Board, Cell, Menu, ShipPlacement, FiringPhase, GameOver
-      hooks/        # useSocket, useGame, useSoundEffects
-      lib/          # types, constants
-  server/           # Express + Socket.IO backend
+      components/        # Board, Cell, Menu, ShipPlacement, FiringPhase, GameOver, ShipSVG, LanguageSelector
+      hooks/             # useSocket, useGame, useSoundEffects
+      lib/               # types, constants, i18n
+  server/                # Express + Socket.IO backend
     src/
-      game/         # GameManager, Board, AIPlayer, types
-      routes/       # REST API for game history
-    prisma/         # Database schema and migrations
+      game/              # GameManager, Board, AIPlayer, types
+      routes/            # REST API for game history
+    prisma/              # Database schema and migrations
+  e2e/                   # Playwright end-to-end tests
+```
+
+## Testing
+
+```bash
+# Server unit tests (79 tests)
+cd server && npm test
+
+# E2E tests (requires dev servers running)
+npx playwright test
 ```
 
 ## Deployment
 
 Configured for Render (free tier). A `render.yaml` is included for one-click deployment.
 
-**Build command:** `npm run install:all && npm run build`
-**Start command:** `npm run start`
-**Environment variable:** `DATABASE_URL=file:./dev.db`
+1. Push repo to GitHub
+2. Create a new Web Service on [render.com](https://render.com)
+3. Connect your GitHub repo — Render auto-detects `render.yaml`
+4. Click "Create Web Service"
 
-### Deploy to Render
+The app will be live at your Render URL (free tier spins down after 15 min inactivity).
 
-1. Push this repo to GitHub
-2. Go to [render.com](https://render.com) and create a new Web Service
-3. Connect your GitHub repo
-4. Render will auto-detect the `render.yaml` config
-5. Click "Create Web Service"
+## Writeup
 
-The app will be live at `https://battleship-XXXX.onrender.com` (free tier spins down after 15 min inactivity, first request after sleep takes ~30s).
+See [WRITEUP.md](./WRITEUP.md) for detailed technical documentation including:
+- Architecture diagrams (Mermaid)
+- Requirements coverage checklist
+- Technical decisions & trade-offs
+- Anti-cheat analysis (6 attack vectors)
+- Scalability analysis
+- AI strategy engine spike (3-tier difficulty)
+- Testing strategy

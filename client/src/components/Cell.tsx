@@ -2,14 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { CellState, ShipName } from '../lib/types';
 import { COLUMN_LABELS } from '../lib/constants';
-
-const SHIP_HUE: Record<ShipName, { bg: string; border: string; glow: string }> = {
-  carrier:    { bg: 'rgba(107,33,168,0.55)', border: 'rgba(147,51,234,0.6)', glow: 'rgba(147,51,234,0.15)' },
-  battleship: { bg: 'rgba(30,64,175,0.55)',  border: 'rgba(59,130,246,0.6)', glow: 'rgba(59,130,246,0.15)' },
-  cruiser:    { bg: 'rgba(15,118,110,0.55)', border: 'rgba(20,184,166,0.6)', glow: 'rgba(20,184,166,0.15)' },
-  submarine:  { bg: 'rgba(22,101,52,0.55)',  border: 'rgba(34,197,94,0.6)',  glow: 'rgba(34,197,94,0.15)' },
-  destroyer:  { bg: 'rgba(161,98,7,0.55)',   border: 'rgba(234,179,8,0.6)',  glow: 'rgba(234,179,8,0.15)' },
-};
+import { SHIP_THEME } from './ShipSVG';
 
 interface ShipEdge {
   isShip: true;
@@ -32,13 +25,14 @@ interface CellProps {
   shipEdge?: ShipEdge | { isShip: false };
 }
 
-function shipBorderRadius(edge: ShipEdge): string {
-  const r = '6px';
-  const z = '2px';
-  if (edge.orientation === 'horizontal') {
-    return `${edge.isFirst ? r : z} ${edge.isLast ? r : z} ${edge.isLast ? r : z} ${edge.isFirst ? r : z}`;
-  }
-  return `${edge.isFirst ? r : z} ${edge.isFirst ? r : z} ${edge.isLast ? r : z} ${edge.isLast ? r : z}`;
+function SplashEffect() {
+  return (
+    <>
+      <div className="splash-ring" />
+      <div className="splash-ring" />
+      <div className="splash-ring" />
+    </>
+  );
 }
 
 export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, disabled, shipEdge }: CellProps) {
@@ -54,6 +48,7 @@ export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, dis
 
   const hasShipEdge = shipEdge && shipEdge.isShip;
   const ownerShipCell = cell.hasShip && isOwner && hasShipEdge;
+  const isSunk = hasShipEdge && (shipEdge as ShipEdge).sunk;
 
   let bgStyle: React.CSSProperties = {};
   let extraClass = 'cell-water';
@@ -61,52 +56,43 @@ export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, dis
 
   if (cell.isHit && cell.hasShip) {
     extraClass = 'cell-hit';
-    bgStyle = { background: 'rgba(255,51,102,0.55)' };
-    content = (
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
-        className="w-full h-full flex items-center justify-center"
-      >
-        <span className="text-white text-sm font-bold drop-shadow-[0_0_8px_rgba(255,51,102,0.9)]">✕</span>
-      </motion.div>
-    );
+    bgStyle = {
+      background: isSunk
+        ? 'linear-gradient(180deg, rgba(40,8,8,0.85) 0%, rgba(80,10,10,0.6) 100%)'
+        : 'linear-gradient(180deg, rgba(60,15,0,0.75) 0%, rgba(100,20,0,0.5) 100%)',
+    };
   } else if (cell.isHit && !cell.hasShip) {
-    extraClass = 'cell-miss';
-    bgStyle = { background: 'rgba(18,29,53,0.8)' };
+    extraClass = 'cell-miss cell-splash';
+    bgStyle = {
+      background: 'radial-gradient(circle at 50% 50%, rgba(0,100,180,0.25) 0%, rgba(13,21,38,0.8) 70%)',
+    };
     content = (
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        className="w-2.5 h-2.5 rounded-full"
-        style={{ background: 'rgba(61,96,144,0.5)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)' }}
-      />
+      <>
+        <SplashEffect />
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="w-2 h-2 rounded-full relative z-[2]"
+          style={{
+            background: 'radial-gradient(circle at 40% 35%, rgba(0,180,255,0.5), rgba(30,60,100,0.6))',
+            boxShadow: '0 0 4px rgba(0,180,255,0.3), inset 0 1px 2px rgba(255,255,255,0.15)',
+          }}
+        />
+      </>
     );
   } else if (ownerShipCell) {
     const edge = shipEdge as ShipEdge;
-    const hue = SHIP_HUE[edge.shipName];
-    extraClass = 'cell-ship';
+    const theme = SHIP_THEME[edge.shipName];
+    extraClass = '';
+
     bgStyle = {
-      background: edge.sunk
-        ? 'rgba(255,17,68,0.25)'
-        : hue.bg,
-      borderColor: edge.sunk
-        ? 'rgba(255,17,68,0.4)'
-        : hue.border,
-      borderRadius: shipBorderRadius(edge),
-      boxShadow: edge.sunk
-        ? 'inset 0 0 8px rgba(255,17,68,0.2)'
-        : `inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.2), 0 0 8px ${hue.glow}`,
+      background: `radial-gradient(ellipse at 50% 50%, ${theme.glow}, transparent 70%)`,
     };
-    if (edge.sunk) {
-      content = (
-        <span className="text-hit/60 text-[10px] font-bold">✕</span>
-      );
-    }
   }
 
   if (isHovering) {
     bgStyle = {};
+    content = null;
     extraClass = hoverValid
       ? 'bg-neon-green/25 ring-1 ring-neon-green/50'
       : 'bg-neon-red/25 ring-1 ring-neon-red/50';
@@ -114,11 +100,12 @@ export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, dis
 
   if (showTargetHover) {
     bgStyle = {
-      background: 'rgba(0,212,255,0.15)',
+      background: 'rgba(0,212,255,0.12)',
       borderColor: 'rgba(0,212,255,0.5)',
       boxShadow: '0 0 12px rgba(0,212,255,0.2), inset 0 0 6px rgba(0,212,255,0.08)',
     };
     extraClass = '';
+    content = null;
   }
 
   return (
@@ -130,9 +117,9 @@ export function Cell({ cell, x, y, onClick, isOwner, isHovering, hoverValid, dis
       aria-label={`${coordLabel}${cell.isHit ? (cell.hasShip ? ', hit' : ', miss') : ''}`}
       className={`
         w-full aspect-square rounded-[3px] border border-ocean-600/20 flex items-center justify-center
-        transition-colors duration-100 relative
+        transition-colors duration-100 relative overflow-hidden
         ${extraClass}
-        ${isClickable ? 'cursor-crosshair hover:brightness-125' : 'cursor-default'}
+        ${isClickable ? 'cursor-crosshair hover:brightness-110' : 'cursor-default'}
       `}
       style={bgStyle}
     >

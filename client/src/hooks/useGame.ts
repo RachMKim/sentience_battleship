@@ -8,6 +8,14 @@ export function useGame(socket: Socket | null) {
   const [lastShot, setLastShot] = useState<ShotResult | null>(null);
   const [opponentDisconnected, setOpponentDisconnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveVersion, setSaveVersion] = useState(0);
+
+  const hasSavedGame = Boolean(
+    typeof window !== 'undefined' &&
+    saveVersion >= 0 &&
+    localStorage.getItem('battleship-gameId') &&
+    localStorage.getItem('battleship-playerId')
+  );
 
   useEffect(() => {
     if (!socket) return;
@@ -15,39 +23,18 @@ export function useGame(socket: Socket | null) {
     const onGameUpdate = (state: ClientGameState) => setGameState(state);
     const onAiShot = (result: ShotResult) => setLastShot(result);
     const onOpponentDisconnected = () => setOpponentDisconnected(true);
-
-    const onConnect = () => {
-      const savedGameId = localStorage.getItem('battleship-gameId');
-      const savedPlayerId = localStorage.getItem('battleship-playerId');
-      if (savedGameId && savedPlayerId) {
-        socket.emit('rejoin-game', {
-          gameId: savedGameId,
-          oldPlayerId: savedPlayerId,
-        }, (response: { state?: ClientGameState; gameId?: string; error?: string }) => {
-          if (!response || response.error) {
-            localStorage.removeItem('battleship-gameId');
-            localStorage.removeItem('battleship-playerId');
-            return;
-          }
-          if (response.state) {
-            setGameState(response.state);
-            setGameId(response.gameId || savedGameId);
-            if (socket.id) localStorage.setItem('battleship-playerId', socket.id);
-          }
-        });
-      }
-    };
+    const onOpponentReconnected = () => setOpponentDisconnected(false);
 
     socket.on('game-update', onGameUpdate);
     socket.on('ai-shot', onAiShot);
     socket.on('opponent-disconnected', onOpponentDisconnected);
-    socket.on('connect', onConnect);
+    socket.on('opponent-reconnected', onOpponentReconnected);
 
     return () => {
       socket.off('game-update', onGameUpdate);
       socket.off('ai-shot', onAiShot);
       socket.off('opponent-disconnected', onOpponentDisconnected);
-      socket.off('connect', onConnect);
+      socket.off('opponent-reconnected', onOpponentReconnected);
     };
   }, [socket]);
 
@@ -122,15 +109,48 @@ export function useGame(socket: Socket | null) {
     [socket, gameId]
   );
 
-  const resetGame = useCallback(() => {
+  const resumeGame = useCallback(() => {
+    if (!socket) return;
+    const savedGameId = localStorage.getItem('battleship-gameId');
+    const savedPlayerId = localStorage.getItem('battleship-playerId');
+    if (!savedGameId || !savedPlayerId) return;
+
+    socket.emit('rejoin-game', {
+      gameId: savedGameId,
+      oldPlayerId: savedPlayerId,
+    }, (response: { state?: ClientGameState; gameId?: string; error?: string }) => {
+      if (!response || response.error) {
+        localStorage.removeItem('battleship-gameId');
+        localStorage.removeItem('battleship-playerId');
+        setError(response?.error || 'Could not resume game');
+        return;
+      }
+      if (response.state) {
+        setGameState(response.state);
+        setGameId(response.gameId || savedGameId);
+        if (socket.id) localStorage.setItem('battleship-playerId', socket.id);
+      }
+    });
+  }, [socket]);
+
+  const pauseGame = useCallback(() => {
     setGameState(null);
     setGameId(null);
     setLastShot(null);
     setOpponentDisconnected(false);
     setError(null);
+  }, []);
+
+  const clearSavedGame = useCallback(() => {
     localStorage.removeItem('battleship-gameId');
     localStorage.removeItem('battleship-playerId');
+    setSaveVersion(v => v + 1);
   }, []);
+
+  const resetGame = useCallback(() => {
+    pauseGame();
+    clearSavedGame();
+  }, [pauseGame, clearSavedGame]);
 
   return {
     gameState,
@@ -138,10 +158,14 @@ export function useGame(socket: Socket | null) {
     lastShot,
     opponentDisconnected,
     error,
+    hasSavedGame,
     createGame,
     joinGame,
     placeShips,
     fireShot,
+    resumeGame,
+    pauseGame,
+    clearSavedGame,
     resetGame,
     setLastShot,
     setError,

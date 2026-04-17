@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import type { BoardGrid, ShipPlacement, ShipName } from '../lib/types';
 import { Cell } from './Cell';
+import { ShipSVG } from './ShipSVG';
 import { COLUMN_LABELS, ROW_LABELS } from '../lib/constants';
+import { SHIPS } from '../lib/types';
 
 interface BoardProps {
   grid: BoardGrid;
@@ -13,6 +15,7 @@ interface BoardProps {
   hoverValid?: boolean;
   ships?: ShipPlacement[];
   shipHealth?: Record<ShipName, number>;
+  opponentShipsSunk?: Record<ShipName, boolean>;
   cellSize?: number;
 }
 
@@ -39,11 +42,59 @@ function buildShipEdgeMap(ships: ShipPlacement[], shipHealth?: Record<ShipName, 
   return map;
 }
 
-export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells, hoverValid, ships, shipHealth, cellSize = 36 }: BoardProps) {
+interface RevealedShip {
+  name: ShipName;
+  cells: { x: number; y: number }[];
+  orientation: 'horizontal' | 'vertical';
+  sunk: boolean;
+}
+
+function buildRevealedEnemyShips(grid: BoardGrid, sunkMap?: Record<ShipName, boolean>): RevealedShip[] {
+  if (!grid || !Array.isArray(grid) || grid.length === 0) return [];
+
+  const shipCells = new Map<ShipName, { x: number; y: number }[]>();
+
+  for (let y = 0; y < grid.length; y++) {
+    const row = grid[y];
+    if (!row) continue;
+    for (let x = 0; x < row.length; x++) {
+      const cell = row[x];
+      if (!cell) continue;
+      if (cell.isHit && cell.hasShip && cell.shipName) {
+        if (!shipCells.has(cell.shipName)) shipCells.set(cell.shipName, []);
+        shipCells.get(cell.shipName)!.push({ x, y });
+      }
+    }
+  }
+
+  const revealed: RevealedShip[] = [];
+  for (const [name, cells] of shipCells) {
+    if (cells.length === 0) continue;
+    const sunk = sunkMap ? sunkMap[name] === true : false;
+
+    let orient: 'horizontal' | 'vertical' = 'horizontal';
+    if (cells.length > 1) {
+      orient = cells[0].x === cells[1].x ? 'vertical' : 'horizontal';
+    }
+
+    cells.sort((a, b) => orient === 'horizontal' ? a.x - b.x : a.y - b.y);
+    revealed.push({ name, cells, orientation: orient, sunk });
+  }
+  return revealed;
+}
+
+const GAP = 2;
+const PAD = 6;
+
+export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells, hoverValid, ships, shipHealth, opponentShipsSunk, cellSize: cellSizeProp }: BoardProps) {
+  const defaultSize = typeof window !== 'undefined' && window.innerWidth < 480 ? 28 : 36;
+  const cellSize = cellSizeProp ?? defaultSize;
   if (!grid || grid.length === 0) return null;
 
   const hoverSet = new Set(hoverCells?.map(c => `${c.x},${c.y}`) || []);
   const shipEdgeMap = ships ? buildShipEdgeMap(ships, shipHealth) : new Map<string, ShipEdge>();
+
+  const revealedEnemyShips = !isOwner ? buildRevealedEnemyShips(grid, opponentShipsSunk) : [];
 
   return (
     <motion.div
@@ -59,7 +110,6 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
       </h3>
 
       <div>
-        {/* Column labels */}
         <div className="flex mb-1" style={{ marginLeft: '2rem' }}>
           {COLUMN_LABELS.map(label => (
             <div key={label} className="text-center text-xs text-ocean-400/80 font-mono" style={{ width: `${cellSize}px` }}>
@@ -69,7 +119,6 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
         </div>
 
         <div className="flex">
-          {/* Row labels */}
           <div className="flex flex-col mr-1 justify-around">
             {ROW_LABELS.map(label => (
               <div key={label} className="h-full flex items-center justify-end pr-1 text-xs text-ocean-400/80 font-mono w-7">
@@ -78,29 +127,121 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
             ))}
           </div>
 
-          <div
-            className="grid gap-[2px] p-1.5 rounded-lg board-frame"
-            style={{
-              gridTemplateColumns: `repeat(10, ${cellSize}px)`,
-              gridTemplateRows: `repeat(10, ${cellSize}px)`,
-            }}
-          >
-            {grid.map((row, y) =>
-              row.map((cell, x) => (
-                <Cell
-                  key={`${x}-${y}`}
-                  cell={cell}
-                  x={x}
-                  y={y}
-                  onClick={onCellClick}
-                  isOwner={isOwner}
-                  isHovering={hoverSet.has(`${x},${y}`)}
-                  hoverValid={hoverValid}
-                  disabled={disabled}
-                  shipEdge={shipEdgeMap.get(`${x},${y}`)}
-                />
-              ))
-            )}
+          <div className="relative">
+            <div
+              className="grid gap-[2px] p-1.5 rounded-lg board-frame"
+              style={{
+                gridTemplateColumns: `repeat(10, ${cellSize}px)`,
+                gridTemplateRows: `repeat(10, ${cellSize}px)`,
+              }}
+            >
+              {grid.map((row, y) =>
+                row.map((cell, x) => (
+                  <Cell
+                    key={`${x}-${y}`}
+                    cell={cell}
+                    x={x}
+                    y={y}
+                    onClick={onCellClick}
+                    isOwner={isOwner}
+                    isHovering={hoverSet.has(`${x},${y}`)}
+                    hoverValid={hoverValid}
+                    disabled={disabled}
+                    shipEdge={shipEdgeMap.get(`${x},${y}`)}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Owner ship SVGs + fire on hits */}
+            {isOwner && ships && ships.map(ship => {
+              const sunk = shipHealth ? shipHealth[ship.name] === 0 : false;
+              const left = PAD + ship.x * (cellSize + GAP);
+              const top = PAD + ship.y * (cellSize + GAP);
+
+              const hitIndices: number[] = [];
+              for (let i = 0; i < ship.length; i++) {
+                const cx = ship.orientation === 'horizontal' ? ship.x + i : ship.x;
+                const cy = ship.orientation === 'vertical' ? ship.y + i : ship.y;
+                if (grid[cy]?.[cx]?.isHit) hitIndices.push(i);
+              }
+
+              return (
+                <div key={ship.name} style={{ position: 'absolute', left, top, pointerEvents: 'none', zIndex: 1 }}>
+                  <ShipSVG name={ship.name} cellCount={ship.length} orientation={ship.orientation} cellSize={cellSize} sunk={sunk} />
+                  {hitIndices.map(idx => {
+                    const isHoriz = ship.orientation === 'horizontal';
+                    return (
+                      <div key={idx} className={sunk ? 'cell-sunk-fire' : 'cell-fire'}
+                        style={{
+                          position: 'absolute',
+                          left: isHoriz ? idx * (cellSize + GAP) : 0,
+                          top: isHoriz ? 0 : idx * (cellSize + GAP),
+                          width: cellSize, height: cellSize,
+                          pointerEvents: 'none', zIndex: 2,
+                        }}>
+                        {sunk ? (
+                          <div className="sunk-embers"><div className="ember" /><div className="ember" /><div className="ember" /></div>
+                        ) : (
+                          <div className="flame-layer">
+                            <div className="smoke-wisp" /><div className="smoke-wisp" />
+                            <div className="flame-glow" /><div className="flame-core" /><div className="flame-inner" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+
+            {/* Enemy board: revealed ship silhouettes from hit cells + fire/embers */}
+            {!isOwner && revealedEnemyShips.map(rs => {
+              const firstCell = rs.cells[0];
+              const left = PAD + firstCell.x * (cellSize + GAP);
+              const top = PAD + firstCell.y * (cellSize + GAP);
+              const shipDef = SHIPS.find(s => s.name === rs.name);
+              const fullLength = shipDef?.length || rs.cells.length;
+
+              if (rs.sunk && rs.cells.length === fullLength) {
+                return (
+                  <div key={rs.name} style={{ position: 'absolute', left, top, pointerEvents: 'none', zIndex: 1 }}>
+                    <ShipSVG name={rs.name} cellCount={fullLength} orientation={rs.orientation} cellSize={cellSize} sunk />
+                    {rs.cells.map((_, idx) => {
+                      const isHoriz = rs.orientation === 'horizontal';
+                      return (
+                        <div key={idx} className="cell-sunk-fire"
+                          style={{
+                            position: 'absolute',
+                            left: isHoriz ? idx * (cellSize + GAP) : 0,
+                            top: isHoriz ? 0 : idx * (cellSize + GAP),
+                            width: cellSize, height: cellSize,
+                            pointerEvents: 'none', zIndex: 2,
+                          }}>
+                          <div className="sunk-embers"><div className="ember" /><div className="ember" /><div className="ember" /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              return rs.cells.map((cell, idx) => (
+                <div key={`${rs.name}-${idx}`} className="cell-fire"
+                  style={{
+                    position: 'absolute',
+                    left: PAD + cell.x * (cellSize + GAP),
+                    top: PAD + cell.y * (cellSize + GAP),
+                    width: cellSize, height: cellSize,
+                    pointerEvents: 'none', zIndex: 1,
+                  }}>
+                  <div className="flame-layer">
+                    <div className="smoke-wisp" /><div className="smoke-wisp" />
+                    <div className="flame-glow" /><div className="flame-core" /><div className="flame-inner" />
+                  </div>
+                </div>
+              ));
+            })}
           </div>
         </div>
       </div>

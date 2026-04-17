@@ -1,18 +1,21 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { ClientGameState, ShotResult } from '../lib/types';
+import type { ClientGameState, ShotResult, ShipName } from '../lib/types';
 import { Board } from './Board';
-import { SHIP_LABELS } from '../lib/constants';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import { ShipIcon } from './ShipSVG';
+import { useI18n } from '../lib/i18n';
 
 interface FiringPhaseProps {
   gameState: ClientGameState;
   onFire: (x: number, y: number) => void;
   lastShot: ShotResult | null;
   onClearShot: () => void;
+  onQuit: () => void;
 }
 
-export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: FiringPhaseProps) {
+export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }: FiringPhaseProps) {
+  const { t } = useI18n();
   const { playHit, playMiss, playSunk } = useSoundEffects();
   const prevShotRef = useRef<ShotResult | null>(null);
 
@@ -37,16 +40,23 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: Firing
   const opponentShipsRemaining = Object.entries(gameState.opponentShipsSunk).filter(([, sunk]) => !sunk).length;
   const myShipsRemaining = Object.entries(gameState.myShipHealth).filter(([, hp]) => hp > 0).length;
 
+  const getShotLabel = () => {
+    if (!lastShot) return '';
+    if (lastShot.sunk && lastShot.shipName) {
+      return t('sunk_ship', { ship: t(lastShot.shipName) });
+    }
+    return lastShot.hit ? t('direct_hit') : t('miss');
+  };
+
   return (
     <div className="flex flex-col items-center px-4 py-8">
-      {/* Turn indicator */}
       <motion.div
         key={isMyTurn ? 'my-turn' : 'their-turn'}
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         className="mb-6 text-center"
       >
-        <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-sm font-display tracking-wider btn-3d
+        <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-xs sm:text-sm font-display tracking-wider btn-3d
           ${isMyTurn
             ? 'border-neon-green/40 text-neon-green bg-gradient-to-b from-neon-green/15 to-neon-green/5'
             : 'border-neon-orange/40 text-neon-orange bg-gradient-to-b from-neon-orange/15 to-neon-orange/5'
@@ -64,91 +74,122 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: Firing
               ? 'bg-neon-green shadow-[0_0_8px_rgba(0,255,136,0.6)]'
               : 'bg-neon-orange shadow-[0_0_8px_rgba(255,136,0,0.6)]'}`}
           />
-          {isMyTurn ? 'YOUR TURN — SELECT TARGET' : 'OPPONENT FIRING...'}
+          {isMyTurn ? t('your_turn') : t('opponent_firing')}
         </div>
       </motion.div>
 
-      {/* Shot feedback toast */}
-      <AnimatePresence>
-        {lastShot && (
-          <motion.div
-            initial={{ opacity: 0, y: -30, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -20, scale: 0.8 }}
-            className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl border font-display tracking-wider text-sm
-              ${lastShot.sunk
-                ? 'border-sunk/50 bg-sunk/20 text-white text-3d-red'
-                : lastShot.hit
-                ? 'border-hit/50 bg-hit/20 text-hit'
-                : 'border-ocean-400/50 bg-ocean-800/90 text-ocean-300'
-              }`}
-            style={{
-              boxShadow: lastShot.sunk
-                ? '0 4px 20px rgba(255,17,68,0.3), 0 2px 0 rgba(0,0,0,0.3)'
-                : lastShot.hit
-                ? '0 4px 20px rgba(255,51,102,0.2), 0 2px 0 rgba(0,0,0,0.3)'
-                : '0 4px 12px rgba(0,0,0,0.3), 0 2px 0 rgba(0,0,0,0.2)'
-            }}
-          >
-            {lastShot.sunk && lastShot.shipName
-              ? `${SHIP_LABELS[lastShot.shipName as keyof typeof SHIP_LABELS] || lastShot.shipName} SUNK!`
-              : lastShot.hit
-              ? 'HIT!'
-              : 'MISS'}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="h-12 mb-2 flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          {lastShot && (
+            <motion.div
+              key={`${lastShot.x}-${lastShot.y}`}
+              initial={{ opacity: 0, scale: 0.5, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -10 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className={`px-4 sm:px-6 py-2 rounded-lg border font-display tracking-wider
+                ${lastShot.sunk
+                  ? 'border-sunk/60 text-white'
+                  : lastShot.hit
+                  ? 'border-hit/50 text-hit'
+                  : 'border-ocean-400/40 text-ocean-300'
+                }`}
+              style={{
+                background: lastShot.sunk
+                  ? 'linear-gradient(135deg, rgba(120,0,20,0.9) 0%, rgba(60,0,10,0.95) 100%)'
+                  : lastShot.hit
+                  ? 'linear-gradient(135deg, rgba(100,15,0,0.85) 0%, rgba(50,10,0,0.9) 100%)'
+                  : 'linear-gradient(135deg, rgba(13,21,38,0.85) 0%, rgba(10,14,26,0.9) 100%)',
+                boxShadow: lastShot.sunk
+                  ? '0 0 40px rgba(255,17,68,0.35), 0 4px 16px rgba(255,17,68,0.25)'
+                  : lastShot.hit
+                  ? '0 0 24px rgba(255,80,0,0.25), 0 4px 12px rgba(255,51,102,0.15)'
+                  : '0 4px 12px rgba(0,0,0,0.3)',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                {lastShot.sunk ? (
+                  <motion.span className="text-2xl"
+                    animate={{ scale: [1, 1.3, 1] }}
+                    transition={{ duration: 0.5 }}>💥</motion.span>
+                ) : lastShot.hit ? (
+                  <motion.span className="text-xl"
+                    animate={{ rotate: [0, -10, 10, 0] }}
+                    transition={{ duration: 0.4 }}>🔥</motion.span>
+                ) : (
+                  <span className="text-lg">💧</span>
+                )}
+                <div>
+                  <div className={`text-sm ${lastShot.sunk ? 'text-3d-red text-base' : ''}`}>
+                    {getShotLabel()}
+                  </div>
+                  {lastShot.sunk && (
+                    <div className="text-[9px] text-red-300/50 tracking-widest">{t('vessel_destroyed')}</div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
-      {/* Boards */}
-      <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 items-center">
-        <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 items-center w-full max-w-4xl">
+        <div className="flex flex-col items-center gap-2 w-full lg:w-auto">
           <Board
             grid={gameState.opponentBoard}
             isOwner={false}
             onCellClick={isMyTurn ? onFire : undefined}
             disabled={!isMyTurn}
-            title="ENEMY WATERS"
+            title={t('enemy_waters')}
+            opponentShipsSunk={gameState.opponentShipsSunk}
           />
           <p className="text-ocean-500 text-xs font-display" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
-            Ships remaining: {opponentShipsRemaining}/5
+            {t('ships_remaining', { count: opponentShipsRemaining })}
           </p>
         </div>
 
-        {/* Divider */}
         <div className="hidden lg:flex flex-col items-center gap-2 text-ocean-600">
           <div className="w-px h-16 bg-gradient-to-b from-transparent via-ocean-600 to-transparent shadow-[0_0_8px_rgba(36,58,94,0.4)]" />
           <span className="text-xs font-display tracking-widest"
-            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>VS</span>
+            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{t('vs')}</span>
           <div className="w-px h-16 bg-gradient-to-b from-transparent via-ocean-600 to-transparent shadow-[0_0_8px_rgba(36,58,94,0.4)]" />
         </div>
 
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 w-full lg:w-auto">
           <Board
             grid={gameState.myBoard}
             isOwner={true}
             disabled={true}
-            title="YOUR FLEET"
+            title={t('your_fleet')}
             ships={gameState.myShips}
             shipHealth={gameState.myShipHealth}
           />
           <p className="text-ocean-500 text-xs font-display" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
-            Ships remaining: {myShipsRemaining}/5
+            {t('ships_remaining', { count: myShipsRemaining })}
           </p>
         </div>
       </div>
 
-      {/* Ship status panels */}
-      <div className="flex flex-col lg:flex-row gap-6 mt-6 w-full max-w-4xl">
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mt-6 w-full max-w-4xl">
         <OpponentShipStatusPanel
-          title="ENEMY FLEET"
+          title={t('enemy_fleet')}
           shipsSunk={gameState.opponentShipsSunk}
         />
         <ShipStatusPanel
-          title="YOUR FLEET"
+          title={t('your_fleet')}
           shipHealth={gameState.myShipHealth}
-          isOpponent={false}
         />
       </div>
+
+      <button
+        onClick={onQuit}
+        className="mt-6 px-5 py-2.5 text-xs font-display tracking-wider rounded-lg border
+          border-neon-red/30 text-neon-red/70 bg-neon-red/5
+          hover:border-neon-red/60 hover:text-neon-red hover:bg-neon-red/10
+          transition-all duration-200 btn-3d"
+      >
+        {t('quit_game')}
+      </button>
     </div>
   );
 }
@@ -157,19 +198,21 @@ function OpponentShipStatusPanel({ title, shipsSunk }: {
   title: string;
   shipsSunk: Record<string, boolean>;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex-1 glass-panel rounded-xl border border-ocean-700/30 p-4">
       <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-3"
         style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{title}</h4>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {Object.entries(shipsSunk).map(([name, sunk]) => (
-          <div key={name} className="flex items-center justify-between text-xs">
-            <span className={`font-display tracking-wider ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
-              {SHIP_LABELS[name as keyof typeof SHIP_LABELS]}
+          <div key={name} className="flex items-center gap-2.5 text-xs">
+            <ShipIcon name={name as ShipName} size={28} sunk={sunk} />
+            <span className={`font-display tracking-wider flex-1 ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
+              {t(name)}
             </span>
             <span className={`font-display tracking-wider text-[10px] ${sunk ? 'text-hit' : 'text-ocean-500'}`}
               style={{ textShadow: sunk ? '0 0 6px rgba(255,51,102,0.4)' : 'none' }}>
-              {sunk ? 'SUNK' : 'ACTIVE'}
+              {sunk ? t('sunk') : t('active')}
             </span>
           </div>
         ))}
@@ -178,39 +221,35 @@ function OpponentShipStatusPanel({ title, shipsSunk }: {
   );
 }
 
-function ShipStatusPanel({ title, shipHealth, isOpponent }: {
+function ShipStatusPanel({ title, shipHealth }: {
   title: string;
   shipHealth: Record<string, number>;
-  isOpponent: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex-1 glass-panel rounded-xl border border-ocean-700/30 p-4">
       <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-3"
         style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{title}</h4>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {Object.entries(shipHealth).map(([name, hp]) => {
-          const ship = { carrier: 5, battleship: 4, cruiser: 3, submarine: 3, destroyer: 2 }[name] || 0;
+          const maxHp = { carrier: 5, battleship: 4, cruiser: 3, submarine: 3, destroyer: 2 }[name] || 0;
           const sunk = hp === 0;
           return (
-            <div key={name} className="flex items-center justify-between text-xs">
-              <span className={`font-display tracking-wider ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
-                {SHIP_LABELS[name as keyof typeof SHIP_LABELS]}
+            <div key={name} className="flex items-center gap-2.5 text-xs">
+              <ShipIcon name={name as ShipName} size={28} sunk={sunk} />
+              <span className={`font-display tracking-wider flex-1 ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
+                {t(name)}
               </span>
               <div className="flex gap-0.5">
-                {Array.from({ length: ship }).map((_, i) => (
+                {Array.from({ length: maxHp }).map((_, i) => (
                   <div
                     key={i}
-                    className={`w-2.5 h-2.5 rounded-sm ${
-                      i < hp
-                        ? isOpponent ? 'bg-ocean-500' : 'bg-neon-green/60'
-                        : 'bg-hit/60'
-                    }`}
+                    className="w-2 h-2 rounded-full"
                     style={{
+                      background: i < hp ? 'rgba(0,255,136,0.6)' : 'rgba(255,51,102,0.45)',
                       boxShadow: i < hp
-                        ? isOpponent
-                          ? 'inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.3)'
-                          : 'inset 0 1px 0 rgba(255,255,255,0.1), 0 1px 2px rgba(0,0,0,0.3), 0 0 4px rgba(0,255,136,0.2)'
-                        : 'inset 0 1px 2px rgba(0,0,0,0.4)'
+                        ? '0 0 4px rgba(0,255,136,0.3)'
+                        : 'inset 0 1px 2px rgba(0,0,0,0.3)',
                     }}
                   />
                 ))}

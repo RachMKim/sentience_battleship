@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import type { ClientGameState } from '../lib/types';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import { useI18n } from '../lib/i18n';
 
 interface GameOverProps {
   gameState: ClientGameState;
@@ -10,6 +11,7 @@ interface GameOverProps {
 }
 
 export function GameOver({ gameState, onRematch, onMenu }: GameOverProps) {
+  const { t } = useI18n();
   const { playVictory } = useSoundEffects();
   const isWinner = gameState.winner === gameState.playerId;
 
@@ -25,7 +27,6 @@ export function GameOver({ gameState, onRematch, onMenu }: GameOverProps) {
         transition={{ duration: 0.5, ease: 'easeOut' }}
         className="text-center max-w-md"
       >
-        {/* Card with 3D glow */}
         <motion.div
           animate={isWinner ? {
             boxShadow: [
@@ -50,7 +51,7 @@ export function GameOver({ gameState, onRematch, onMenu }: GameOverProps) {
               isWinner ? 'text-neon-green text-3d-green' : 'text-hit text-3d-red'
             }`}
           >
-            {isWinner ? 'VICTORY' : 'DEFEAT'}
+            {isWinner ? t('victory') : t('defeat')}
           </motion.h1>
 
           <motion.p
@@ -60,9 +61,7 @@ export function GameOver({ gameState, onRematch, onMenu }: GameOverProps) {
             className="text-ocean-300 mb-8"
             style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
           >
-            {isWinner
-              ? 'All enemy ships have been destroyed!'
-              : 'Your fleet has been destroyed.'}
+            {isWinner ? t('victory_msg') : t('defeat_msg')}
           </motion.p>
 
           <motion.div
@@ -86,7 +85,7 @@ export function GameOver({ gameState, onRematch, onMenu }: GameOverProps) {
                   : '0 0 8px rgba(255,51,102,0.4)'
               }}
             >
-              REMATCH
+              {t('rematch')}
             </motion.button>
 
             <motion.button
@@ -97,7 +96,7 @@ export function GameOver({ gameState, onRematch, onMenu }: GameOverProps) {
                 font-display tracking-wider hover:border-ocean-400 transition-all duration-300 btn-3d
                 bg-gradient-to-b from-ocean-700/50 to-ocean-800/50"
             >
-              MAIN MENU
+              {t('main_menu')}
             </motion.button>
           </motion.div>
         </motion.div>
