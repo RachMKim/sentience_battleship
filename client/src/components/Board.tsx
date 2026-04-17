@@ -1,3 +1,4 @@
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import type { BoardGrid, ShipPlacement, ShipName } from '../lib/types';
 import { Cell } from './Cell';
@@ -16,7 +17,6 @@ interface BoardProps {
   ships?: ShipPlacement[];
   shipHealth?: Record<ShipName, number>;
   opponentShipsSunk?: Record<ShipName, boolean>;
-  cellSize?: number;
 }
 
 type ShipEdge = { isShip: true; shipName: ShipName; isFirst: boolean; isLast: boolean; orientation: 'horizontal' | 'vertical'; sunk: boolean }
@@ -86,14 +86,29 @@ function buildRevealedEnemyShips(grid: BoardGrid, sunkMap?: Record<ShipName, boo
 const GAP = 2;
 const PAD = 6;
 
-export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells, hoverValid, ships, shipHealth, opponentShipsSunk, cellSize: cellSizeProp }: BoardProps) {
-  const defaultSize = typeof window !== 'undefined' && window.innerWidth < 480 ? 28 : 36;
-  const cellSize = cellSizeProp ?? defaultSize;
+export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells, hoverValid, ships, shipHealth, opponentShipsSunk }: BoardProps) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(0);
+
+  const measure = useCallback(() => {
+    if (!gridRef.current) return;
+    const firstCell = gridRef.current.querySelector('button');
+    if (firstCell) {
+      setCellSize(firstCell.offsetWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (gridRef.current) ro.observe(gridRef.current);
+    return () => ro.disconnect();
+  }, [measure]);
+
   if (!grid || grid.length === 0) return null;
 
   const hoverSet = new Set(hoverCells?.map(c => `${c.x},${c.y}`) || []);
   const shipEdgeMap = ships ? buildShipEdgeMap(ships, shipHealth) : new Map<string, ShipEdge>();
-
   const revealedEnemyShips = !isOwner ? buildRevealedEnemyShips(grid, opponentShipsSunk) : [];
 
   return (
@@ -101,39 +116,40 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="flex flex-col items-center"
+      className="flex flex-col items-center w-full"
     >
-      <h3 className="text-sm font-display uppercase tracking-widest text-ocean-300 mb-3"
+      <h3 className="text-xs sm:text-sm font-display uppercase tracking-widest text-ocean-300 mb-2 sm:mb-3"
         style={{ textShadow: '0 0 10px rgba(90,130,180,0.4), 0 1px 0 rgba(0,0,0,0.4)' }}
       >
         {title}
       </h3>
 
-      <div>
-        <div className="flex mb-1" style={{ marginLeft: '2rem' }}>
+      <div className="w-full">
+        {/* Column labels */}
+        <div className="grid grid-cols-10 gap-[2px] mb-0.5" style={{ marginLeft: '28px', paddingLeft: `${PAD}px`, paddingRight: `${PAD}px` }}>
           {COLUMN_LABELS.map(label => (
-            <div key={label} className="text-center text-xs text-ocean-400/80 font-mono" style={{ width: `${cellSize}px` }}>
+            <div key={label} className="text-center text-[10px] sm:text-xs text-ocean-400/80 font-mono">
               {label}
             </div>
           ))}
         </div>
 
         <div className="flex">
-          <div className="flex flex-col mr-1 justify-around">
+          {/* Row labels */}
+          <div className="flex flex-col w-7 shrink-0" style={{ paddingTop: `${PAD}px`, paddingBottom: `${PAD}px` }}>
             {ROW_LABELS.map(label => (
-              <div key={label} className="h-full flex items-center justify-end pr-1 text-xs text-ocean-400/80 font-mono w-7">
+              <div key={label} className="flex-1 flex items-center justify-end pr-1 text-[10px] sm:text-xs text-ocean-400/80 font-mono" style={{ gap: '2px' }}>
                 {label}
               </div>
             ))}
           </div>
 
-          <div className="relative">
+          {/* Grid — cells use 1fr to fill available space */}
+          <div className="relative flex-1">
             <div
-              className="grid gap-[2px] p-1.5 rounded-lg board-frame"
-              style={{
-                gridTemplateColumns: `repeat(10, ${cellSize}px)`,
-                gridTemplateRows: `repeat(10, ${cellSize}px)`,
-              }}
+              ref={gridRef}
+              className="grid grid-cols-10 gap-[2px] p-1.5 rounded-lg board-frame w-full"
+              style={{ aspectRatio: '1 / 1' }}
             >
               {grid.map((row, y) =>
                 row.map((cell, x) => (
@@ -154,7 +170,7 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
             </div>
 
             {/* Owner ship SVGs + fire on hits */}
-            {isOwner && ships && ships.map(ship => {
+            {cellSize > 0 && isOwner && ships && ships.map(ship => {
               const sunk = shipHealth ? shipHealth[ship.name] === 0 : false;
               const left = PAD + ship.x * (cellSize + GAP);
               const top = PAD + ship.y * (cellSize + GAP);
@@ -195,8 +211,8 @@ export function Board({ grid, isOwner, onCellClick, disabled, title, hoverCells,
               );
             })}
 
-            {/* Enemy board: revealed ship silhouettes from hit cells + fire/embers */}
-            {!isOwner && revealedEnemyShips.map(rs => {
+            {/* Enemy board: revealed ship silhouettes from hit cells */}
+            {cellSize > 0 && !isOwner && revealedEnemyShips.map(rs => {
               const firstCell = rs.cells[0];
               const left = PAD + firstCell.x * (cellSize + GAP);
               const top = PAD + firstCell.y * (cellSize + GAP);

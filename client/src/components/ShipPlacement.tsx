@@ -86,7 +86,20 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
   const [drag, setDrag] = useState<DragState | null>(null);
   const [dropTarget, setDropTarget] = useState<{ x: number; y: number } | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
-  const cellSize = 40;
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [cellSize, setCellSize] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      if (!gridRef.current) return;
+      const firstCell = gridRef.current.querySelector('button');
+      if (firstCell) setCellSize(firstCell.offsetWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (gridRef.current) ro.observe(gridRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   const placedNames = new Set(placements.map(p => p.name));
 
@@ -217,6 +230,7 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
     if (!drag) return;
 
     const onMove = (e: MouseEvent | TouchEvent) => {
+      if ('touches' in e) e.preventDefault();
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
       const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
       setDrag(prev => prev ? { ...prev, cursorX: clientX, cursorY: clientY } : null);
@@ -370,14 +384,14 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
   }
 
   return (
-    <div className="flex flex-col items-center px-4 py-8 select-none">
+    <div className="flex flex-col items-center px-3 sm:px-6 py-4 sm:py-8 select-none w-full max-w-5xl mx-auto">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col items-center gap-5"
+        className="flex flex-col items-center gap-4 sm:gap-5 w-full"
       >
         <div className="text-center">
-          <h2 className="text-2xl font-display text-white tracking-wider mb-1 text-3d">{t('deploy_fleet')}</h2>
+          <h2 className="text-xl sm:text-2xl font-display text-white tracking-wider mb-1 text-3d">{t('deploy_fleet')}</h2>
           {drag && (
             <p className="text-ocean-400 text-sm">
               {t('dragging')} <span className="text-neon-blue font-semibold"
@@ -406,7 +420,7 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
           )}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap justify-center gap-3">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -444,9 +458,9 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
           &nbsp;&#183;&nbsp; {t('drag_hint')}
         </p>
 
-        <div className="flex flex-col lg:flex-row gap-6 items-start w-full max-w-4xl">
+        <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-center md:items-start w-full">
           {/* Fleet panel */}
-          <div className="glass-panel rounded-xl border border-ocean-700/30 p-4 w-full sm:w-56 shrink-0">
+          <div className="glass-panel rounded-xl border border-ocean-700/30 p-3 sm:p-4 w-full md:w-56 shrink-0">
             <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-3"
               style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{t('drag_to_deploy')}</h4>
             <div className="space-y-1.5">
@@ -498,30 +512,31 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
 
           {/* Board */}
           <div
-            className="relative"
+            className="relative w-full md:flex-1 min-w-0"
             onKeyDown={(e) => { if (e.key === 'r' || e.key === 'R') setOrientation(o => o === 'horizontal' ? 'vertical' : 'horizontal'); }}
             tabIndex={0}
           >
-            <div className="flex ml-8 mb-1">
+            <div className="grid grid-cols-10 gap-[2px] mb-0.5" style={{ marginLeft: '28px', paddingLeft: `${PAD}px`, paddingRight: `${PAD}px` }}>
               {COLUMN_LABELS.map(label => (
-                <div key={label} className="text-center text-xs text-ocean-400/80 font-mono" style={{ width: `${cellSize}px` }}>
+                <div key={label} className="text-center text-[10px] sm:text-xs text-ocean-400/80 font-mono">
                   {label}
                 </div>
               ))}
             </div>
             <div className="flex">
-              <div className="flex flex-col mr-1">
+              <div className="flex flex-col w-7 shrink-0" style={{ paddingTop: `${PAD}px`, paddingBottom: `${PAD}px` }}>
                 {ROW_LABELS.map(label => (
-                  <div key={label} className="flex items-center justify-end pr-1 text-xs text-ocean-400/80 font-mono w-7" style={{ height: `${cellSize}px` }}>
+                  <div key={label} className="flex-1 flex items-center justify-end pr-1 text-[10px] sm:text-xs text-ocean-400/80 font-mono">
                     {label}
                   </div>
                 ))}
               </div>
 
-              <div className="relative" ref={boardRef}>
+              <div className="relative flex-1" ref={boardRef}>
                 <div
-                  className="grid gap-[2px] p-1.5 rounded-lg board-frame"
-                  style={{ gridTemplateColumns: `repeat(10, ${cellSize}px)`, gridTemplateRows: `repeat(10, ${cellSize}px)` }}
+                  ref={gridRef}
+                  className="grid grid-cols-10 gap-[2px] p-1.5 rounded-lg board-frame w-full"
+                  style={{ aspectRatio: '1 / 1' }}
                 >
                   {grid.map((row, y) =>
                     row.map((cell, x) => {
@@ -635,7 +650,7 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => onConfirm(placements)}
-              className="px-8 py-3 bg-gradient-to-b from-neon-green/20 to-neon-blue/10 rounded-xl
+              className="w-full px-8 py-3 bg-gradient-to-b from-neon-green/20 to-neon-blue/10 rounded-xl
                 border border-neon-green/40 text-white font-display text-lg tracking-wider
                 hover:border-neon-green/70 transition-all duration-300 btn-3d"
               style={{ textShadow: '0 0 10px rgba(0,255,136,0.4)' }}
@@ -649,10 +664,10 @@ export function ShipPlacement({ onConfirm, waitingForOpponent, onQuit }: ShipPla
       {onQuit && (
         <button
           onClick={onQuit}
-          className="mt-4 px-5 py-2.5 text-xs font-display tracking-wider rounded-lg border
-            border-neon-red/30 text-neon-red/70 bg-neon-red/5
-            hover:border-neon-red/60 hover:text-neon-red hover:bg-neon-red/10
-            transition-all duration-200 btn-3d"
+          className="mt-6 w-full px-6 py-3 text-sm font-display tracking-wider rounded-lg border
+            border-neon-red/40 text-neon-red bg-neon-red/10
+            hover:border-neon-red/60 hover:text-neon-red hover:bg-neon-red/15
+            active:bg-neon-red/20 transition-all duration-200 btn-3d"
         >
           {t('quit_game')}
         </button>

@@ -211,7 +211,7 @@ export function GameHistory({ onBack }: GameHistoryProps) {
             >
               <div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-mono text-ocean-500">{game.id}</span>
+                  <span className="text-xs font-mono text-ocean-500 truncate max-w-[120px] sm:max-w-none">{game.id}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-display tracking-wider
                     ${game.mode === 'ai'
                       ? 'bg-neon-blue/10 text-neon-blue border border-neon-blue/20'

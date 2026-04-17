@@ -49,14 +49,14 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
   };
 
   return (
-    <div className="flex flex-col items-center px-4 py-8">
+    <div className="flex flex-col items-center px-3 sm:px-6 py-4 sm:py-8 w-full max-w-5xl mx-auto">
       <motion.div
         key={isMyTurn ? 'my-turn' : 'their-turn'}
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-6 text-center"
+        className="mb-4 sm:mb-6 text-center"
       >
-        <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full border text-xs sm:text-sm font-display tracking-wider btn-3d
+        <div className={`inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full border text-xs sm:text-sm font-display tracking-wider btn-3d
           ${isMyTurn
             ? 'border-neon-green/40 text-neon-green bg-gradient-to-b from-neon-green/15 to-neon-green/5'
             : 'border-neon-orange/40 text-neon-orange bg-gradient-to-b from-neon-orange/15 to-neon-orange/5'
@@ -78,7 +78,7 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
         </div>
       </motion.div>
 
-      <div className="h-12 mb-2 flex items-center justify-center">
+      <div className="h-10 sm:h-12 mb-2 flex items-center justify-center">
         <AnimatePresence mode="wait">
           {lastShot && (
             <motion.div
@@ -87,7 +87,7 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: -10 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className={`px-4 sm:px-6 py-2 rounded-lg border font-display tracking-wider
+              className={`px-4 py-1.5 sm:py-2 rounded-lg border font-display tracking-wider text-sm
                 ${lastShot.sunk
                   ? 'border-sunk/60 text-white'
                   : lastShot.hit
@@ -107,17 +107,17 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
                   : '0 4px 12px rgba(0,0,0,0.3)',
               }}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {lastShot.sunk ? (
-                  <motion.span className="text-2xl"
+                  <motion.span className="text-xl"
                     animate={{ scale: [1, 1.3, 1] }}
                     transition={{ duration: 0.5 }}>💥</motion.span>
                 ) : lastShot.hit ? (
-                  <motion.span className="text-xl"
+                  <motion.span className="text-lg"
                     animate={{ rotate: [0, -10, 10, 0] }}
                     transition={{ duration: 0.4 }}>🔥</motion.span>
                 ) : (
-                  <span className="text-lg">💧</span>
+                  <span className="text-base">💧</span>
                 )}
                 <div>
                   <div className={`text-sm ${lastShot.sunk ? 'text-3d-red text-base' : ''}`}>
@@ -133,8 +133,10 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
         </AnimatePresence>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 items-center w-full max-w-4xl">
-        <div className="flex flex-col items-center gap-2 w-full lg:w-auto">
+      {/* Boards: column on mobile, row on md+. Each board + its status panel grouped. */}
+      <div className="flex flex-col md:flex-row gap-6 md:gap-8 w-full">
+        {/* Left column: enemy board + enemy status */}
+        <div className="flex flex-col items-center gap-2 w-full md:flex-1 min-w-0">
           <Board
             grid={gameState.opponentBoard}
             isOwner={false}
@@ -143,19 +145,23 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
             title={t('enemy_waters')}
             opponentShipsSunk={gameState.opponentShipsSunk}
           />
-          <p className="text-ocean-500 text-xs font-display" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+          <p className="text-ocean-500 text-[10px] sm:text-xs font-display" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
             {t('ships_remaining', { count: opponentShipsRemaining })}
           </p>
+          <OpponentShipStatusPanel
+            title={t('enemy_fleet')}
+            shipsSunk={gameState.opponentShipsSunk}
+          />
         </div>
 
-        <div className="hidden lg:flex flex-col items-center gap-2 text-ocean-600">
-          <div className="w-px h-16 bg-gradient-to-b from-transparent via-ocean-600 to-transparent shadow-[0_0_8px_rgba(36,58,94,0.4)]" />
-          <span className="text-xs font-display tracking-widest"
-            style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>{t('vs')}</span>
-          <div className="w-px h-16 bg-gradient-to-b from-transparent via-ocean-600 to-transparent shadow-[0_0_8px_rgba(36,58,94,0.4)]" />
+        <div className="hidden md:flex flex-col items-center justify-center gap-2 text-ocean-600 shrink-0">
+          <div className="w-px h-12 bg-gradient-to-b from-transparent via-ocean-600 to-transparent" />
+          <span className="text-xs font-display tracking-widest">{t('vs')}</span>
+          <div className="w-px h-12 bg-gradient-to-b from-transparent via-ocean-600 to-transparent" />
         </div>
 
-        <div className="flex flex-col items-center gap-2 w-full lg:w-auto">
+        {/* Right column: your board + your status */}
+        <div className="flex flex-col items-center gap-2 w-full md:flex-1 min-w-0">
           <Board
             grid={gameState.myBoard}
             isOwner={true}
@@ -164,29 +170,22 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot, onQuit }
             ships={gameState.myShips}
             shipHealth={gameState.myShipHealth}
           />
-          <p className="text-ocean-500 text-xs font-display" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+          <p className="text-ocean-500 text-[10px] sm:text-xs font-display" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
             {t('ships_remaining', { count: myShipsRemaining })}
           </p>
+          <ShipStatusPanel
+            title={t('your_fleet')}
+            shipHealth={gameState.myShipHealth}
+          />
         </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 mt-6 w-full max-w-4xl">
-        <OpponentShipStatusPanel
-          title={t('enemy_fleet')}
-          shipsSunk={gameState.opponentShipsSunk}
-        />
-        <ShipStatusPanel
-          title={t('your_fleet')}
-          shipHealth={gameState.myShipHealth}
-        />
       </div>
 
       <button
         onClick={onQuit}
-        className="mt-6 px-5 py-2.5 text-xs font-display tracking-wider rounded-lg border
-          border-neon-red/30 text-neon-red/70 bg-neon-red/5
-          hover:border-neon-red/60 hover:text-neon-red hover:bg-neon-red/10
-          transition-all duration-200 btn-3d"
+        className="mt-6 w-full px-6 py-3 text-sm font-display tracking-wider rounded-lg border
+          border-neon-red/40 text-neon-red bg-neon-red/10
+          hover:border-neon-red/60 hover:text-neon-red hover:bg-neon-red/15
+          active:bg-neon-red/20 transition-all duration-200 btn-3d"
       >
         {t('quit_game')}
       </button>
@@ -200,13 +199,13 @@ function OpponentShipStatusPanel({ title, shipsSunk }: {
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex-1 glass-panel rounded-xl border border-ocean-700/30 p-4">
-      <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-3"
+    <div className="w-full glass-panel rounded-xl border border-ocean-700/30 p-3 sm:p-4">
+      <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-2 sm:mb-3"
         style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{title}</h4>
-      <div className="space-y-2">
+      <div className="space-y-1.5 sm:space-y-2">
         {Object.entries(shipsSunk).map(([name, sunk]) => (
-          <div key={name} className="flex items-center gap-2.5 text-xs">
-            <ShipIcon name={name as ShipName} size={28} sunk={sunk} />
+          <div key={name} className="flex items-center gap-2 text-xs">
+            <ShipIcon name={name as ShipName} size={24} sunk={sunk} />
             <span className={`font-display tracking-wider flex-1 ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
               {t(name)}
             </span>
@@ -227,16 +226,16 @@ function ShipStatusPanel({ title, shipHealth }: {
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex-1 glass-panel rounded-xl border border-ocean-700/30 p-4">
-      <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-3"
+    <div className="w-full glass-panel rounded-xl border border-ocean-700/30 p-3 sm:p-4">
+      <h4 className="text-xs font-display text-ocean-400 tracking-wider mb-2 sm:mb-3"
         style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>{title}</h4>
-      <div className="space-y-2">
+      <div className="space-y-1.5 sm:space-y-2">
         {Object.entries(shipHealth).map(([name, hp]) => {
           const maxHp = { carrier: 5, battleship: 4, cruiser: 3, submarine: 3, destroyer: 2 }[name] || 0;
           const sunk = hp === 0;
           return (
-            <div key={name} className="flex items-center gap-2.5 text-xs">
-              <ShipIcon name={name as ShipName} size={28} sunk={sunk} />
+            <div key={name} className="flex items-center gap-2 text-xs">
+              <ShipIcon name={name as ShipName} size={24} sunk={sunk} />
               <span className={`font-display tracking-wider flex-1 ${sunk ? 'text-hit line-through' : 'text-ocean-300'}`}>
                 {t(name)}
               </span>

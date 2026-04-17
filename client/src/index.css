@@ -27,9 +27,14 @@
 }
 
 @layer base {
+  html, body {
+    overflow-x: hidden;
+  }
   body {
     @apply bg-ocean-950 text-white font-body antialiased;
     min-height: 100vh;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
@@ -44,6 +49,7 @@
       0 0 80px rgba(0,212,255,0.02);
     border: 2px solid rgba(36,58,94,0.6);
     background: linear-gradient(180deg, rgba(13,21,38,0.95) 0%, rgba(10,14,26,0.98) 100%);
+    touch-action: manipulation;
   }
 
   .cell-water {

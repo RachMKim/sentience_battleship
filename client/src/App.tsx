@@ -142,7 +142,6 @@ function App() {
 
   return (
     <div className="relative">
-      <LanguageSelector />
       {errorToast}
       <AnimatePresence>
         {opponentDisconnected && gameState.phase !== 'finished' && (
