@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "npx prisma generate && tsc",
-    "start": "npx prisma migrate deploy && node dist/index.js",
+    "build": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} npx prisma generate && tsc",
+    "start": "DATABASE_URL=${DATABASE_URL:-file:./dev.db} npx prisma migrate deploy && node dist/index.js",
     "db:migrate": "npx prisma migrate dev",
     "db:generate": "npx prisma generate"
   },

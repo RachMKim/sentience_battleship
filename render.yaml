@@ -3,8 +3,9 @@ services:
     name: battleship
     runtime: node
     plan: free
-    buildCommand: npm run install:all && npm run build
-    startCommand: npm run start
+    # Prisma validates DATABASE_URL at generate/migrate time; inline it so builds work even if dashboard env is missing.
+    buildCommand: 'DATABASE_URL=file:./dev.db npm run install:all && DATABASE_URL=file:./dev.db npm run build'
+    startCommand: 'DATABASE_URL=file:./dev.db npm run start'
     envVars:
       - key: DATABASE_URL
         value: file:./dev.db
