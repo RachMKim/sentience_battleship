@@ -7,7 +7,8 @@
 - [Technical Decisions & Trade-offs](#technical-decisions--trade-offs)
 - [Anti-Cheat: Attack Vectors & Defenses](#anti-cheat-attack-vectors--defenses)
 - [Scalability Analysis](#scalability-analysis)
-- [Spike: AI Strategy Engine + Visual Design System](#spike-ai-strategy-engine--visual-design-system)
+- [Testing Strategy](#testing-strategy)
+- [Spike: AI Strategy Engine](#spike-ai-strategy-engine)
 - [How I Used AI Tools](#how-i-used-ai-tools)
 
 ---
@@ -21,6 +22,7 @@
 | Real-time | Socket.IO | WebSocket abstraction with fallback to polling, rooms, ack callbacks |
 | Backend | Express, Node.js, TypeScript | Lightweight HTTP + WebSocket server, shared types with client |
 | Database | Prisma ORM + SQLite | Type-safe queries, auto-migrations, zero-infrastructure persistence |
+| Testing | Vitest (unit), Playwright (e2e) | Fast unit tests for server logic; browser-based e2e for client flows |
 | Deployment | Render | Free tier, auto-deploy from GitHub, supports Node web services |
 
 ---
@@ -73,8 +75,8 @@
 |-------------|--------|----------------|
 | Complete, rules-correct Battleship | **Done** | 10×10 grid, 5 ships (Carrier-5, Battleship-4, Cruiser-3, Submarine-3, Destroyer-2), turn-based firing, hit/miss/sunk, win detection. All logic in `GameManager.ts` and `Board.ts`. |
 | Ship placement with rotate + validate | **Done** | Client: click-to-place with hover preview (green=valid, red=invalid), R key or button to rotate, undo last ship, randomize all. Server: validates exact fleet composition, no overlaps, within bounds. |
-| Firing phase with both boards visible | **Done** | "ENEMY WATERS" (opponent grid, click to fire) + "YOUR FLEET" (your board with 3D ship overlays and incoming hits). Blue targeting reticle on hover. |
-| Hit/miss/sunk feedback after every shot | **Done** | Animated toast notification (HIT! / MISS / [Ship] SUNK!), procedural sound effects via Web Audio API, visual markers on the grid (red X for hit, blue dot for miss). |
+| Firing phase with both boards visible | **Done** | "ENEMY WATERS" (opponent grid, click to fire) + "YOUR FLEET" (your board with colored ship cells and incoming hits). Blue targeting reticle on hover. All 10 rows fully interactive. |
+| Hit/miss/sunk feedback after every shot | **Done** | Animated toast notification (HIT! / MISS / [Ship] SUNK!), procedural sound effects via Web Audio API, visual markers on the grid (red ✕ for hit, blue dot for miss). |
 | Win detection + rematch/menu | **Done** | VICTORY/DEFEAT screen with animated glow, REMATCH button (restarts with same difficulty for AI), MAIN MENU button. |
 
 ### Game Modes
@@ -90,6 +92,7 @@
 | Requirement | Status | Implementation |
 |-------------|--------|----------------|
 | Deployed to public URL | **Done** | https://sentience-battleship.onrender.com/ — Render free tier, auto-deploys from GitHub on push. |
+| GitHub repository | **Done** | Full monorepo with client/, server/, shared types, tests, CI-ready scripts. |
 
 ### Persistence
 
@@ -104,6 +107,13 @@
 |-------------|--------|----------------|
 | How can a player cheat? | **Done** | See [Anti-Cheat section](#anti-cheat-attack-vectors--defenses) below — 6 attack vectors identified with corresponding defenses. |
 | Runtime complexity at scale | **Done** | See [Scalability section](#scalability-analysis) below — analysis of board size, concurrent games, and database scaling. |
+
+### Testing
+
+| Requirement | Status | Implementation |
+|-------------|--------|----------------|
+| Unit tests | **Done** | 79 tests across Board, AIPlayer, GameManager covering placement, shooting, turn management, AI behavior, win conditions, edge cases, input validation. |
+| E2E tests | **Done** | 9 Playwright tests covering menu rendering, AI game flow, ship placement, firing on all rows (including row 10), no 3D transforms in DOM, game history, board labels. |
 
 ---
 
@@ -137,11 +147,13 @@ Prisma makes this swap trivial because the ORM abstracts the driver.
 
 **Trade-off**: Server restart loses in-memory state. Mitigated by DB-backed `restoreGame()` which reconstructs both game state and AI targeting state from the persisted board. Not suitable for multi-server horizontal scaling without moving state to Redis.
 
-### Why Framer Motion over CSS-only animations?
+### Why flat CSS over 3D transforms?
 
-**Decision**: Framer Motion for UI transitions, CSS for static visual effects (3D transforms, shadows, shimmer).
+**Decision**: Ship visuals rendered as inline colored cells with per-ship hues and rounded endpoints. No CSS 3D perspective transforms.
 
-**Rationale**: Framer Motion provides `AnimatePresence` for exit animations (shot toasts, phase transitions), spring physics, and gesture support (whileHover, whileTap) that would be verbose in CSS. The 3D board tilt and cell depth effects use pure CSS transforms for performance.
+**Rationale**: Initial implementation used `rotateX()` perspective tilts and absolute-positioned ship overlays with `preserve-3d`. This caused persistent click-target failures: the `water-shimmer::after` pseudo-element and ship overlays intercepted pointer events on lower rows, and `justify-center` on the layout pushed the bottom of the board below the viewport fold. After multiple fix attempts, the 3D approach was abandoned in favor of a flat layout that is 100% clickable on all rows, all browsers, all viewport sizes.
+
+**Trade-off**: Slightly less visually dramatic. The ship cells still use distinct per-ship colors (purple carrier, blue battleship, teal cruiser, green submarine, yellow destroyer), rounded endpoints, sunk states, and subtle shadows — preserving a premium feel without the interactivity cost.
 
 ### Why procedural audio over sound files?
 
@@ -216,9 +228,42 @@ For horizontal scaling: move game state to Redis with pub/sub for cross-server b
 
 ---
 
-## Spike: AI Strategy Engine + Visual Design System
+## Testing Strategy
 
-### AI Strategy Engine
+### Unit Tests (79 tests, Vitest)
+
+Server game logic tested comprehensively:
+
+- **Board.ts** — Grid creation, ship placement validation (bounds, overlaps, edges), random fleet placement (completeness, no overlap, within bounds), shot processing (hit, miss, sunk, allSunk, duplicate, out-of-bounds), board visibility (owner vs opponent projections).
+- **AIPlayer.ts** — State initialization, shot generation for all 3 difficulties, bounds checking, no duplicate shots, nearly-full board handling, hunt/target mode transitions, adjacent cell targeting, sunk ship cleanup, checkerboard pattern verification.
+- **GameManager.ts** — Game creation (AI/multiplayer), joining (valid/rejected cases), fleet validation (incomplete, duplicate names, wrong lengths, out-of-bounds, non-integer coords, invalid orientation, double placement), shot firing (turn enforcement, bounds, duplicates), AI response, client state projection (hides ships, exposes sunk status), disconnect handling, full game simulation to completion.
+
+### E2E Tests (9 tests, Playwright)
+
+Client flows tested against the running app:
+
+- Main menu renders with all options (VS COMPUTER, CREATE/JOIN ROOM, GAME HISTORY)
+- VS COMPUTER shows difficulty selection (EASY, MEDIUM, HARD)
+- AI game reaches placement phase with correct UI
+- Randomize places all ships and shows CONFIRM button
+- Full AI game flow: placement → firing → shots register on all rows including row 10
+- No 3D perspective transforms exist in the DOM (regression test)
+- Game history page loads without crash
+- Board has 10 row labels (1-10) and column labels (A-J)
+
+### Running Tests
+
+```bash
+# Unit tests
+cd server && npm test
+
+# E2E tests (requires dev servers running)
+npx playwright test
+```
+
+---
+
+## Spike: AI Strategy Engine
 
 I chose the AI as my spike because competitive Battleship has well-studied optimal play, and implementing the algorithm hierarchy (random → hunt/target → probability density) demonstrates both algorithmic thinking and practical game design.
 
@@ -232,16 +277,6 @@ I chose the AI as my spike because competitive Battleship has well-studied optim
 
 The Hard AI uses the same core algorithm as competitive Battleship solvers (Donald Knuth's approach). Runtime is O(S × N² × 2) per shot — trivial for 10×10 but the asymptotic analysis matters if the board scales.
 
-### Visual Design System
-
-The UI is built around a cohesive "naval command center" aesthetic:
-
-- **3D perspective boards** — CSS `rotateX(12deg)` with `preserve-3d` creates depth. Ship models use layered divs with hull, deck features (bridges, turrets, masts), and shadow casting.
-- **Neon targeting system** — Blue reticle glow on hover, green/red placement preview, pulsing turn indicator.
-- **Procedural audio** — All 5 sound effects (hit, miss, sunk, place, victory) generated via Web Audio API oscillators with frequency curves and gain envelopes. Zero external assets.
-- **Motion design** — Framer Motion handles phase transitions, shot feedback toasts, staggered menu reveals, and cell interaction feedback (scale on hover/tap).
-- **Accessibility** — `prefers-reduced-motion` disables shimmer animations, `aria-label` on grid cells with coordinates (e.g., "B3, hit"), React error boundary with themed recovery UI.
-
 ---
 
 ## How I Used AI Tools
@@ -250,13 +285,15 @@ I used **Cursor with Claude** as my primary development tool throughout this pro
 
 **Where AI excelled**:
 - **Scaffolding** — Project structure, Prisma schema, Express + Socket.IO boilerplate, Tailwind config. AI generated 80%+ of this correctly on first pass.
-- **Systematic auditing** — I had AI read every file in the codebase and report bugs, security gaps, edge cases, and UX issues. This identified issues I would have missed in manual review (e.g., the 3D ship overlay intercepting grid clicks, silent fire errors in the client, `opponentShipHealth` leaking exact HP).
+- **Systematic auditing** — I had AI read every file in the codebase and report bugs, security gaps, edge cases, and UX issues. This identified issues I would have missed in manual review (e.g., the ship overlay intercepting grid clicks, silent fire errors in the client, `opponentShipHealth` leaking exact HP).
+- **Test generation** — AI generated comprehensive unit and e2e test suites, covering edge cases I specified and discovering additional boundary conditions.
 - **Component iteration** — Generated React components with Tailwind styling, then iterated on visual details through conversation.
 
 **Where I directed the work**:
 - **Architecture** — The server-authoritative design, the state projection model, and the anti-cheat strategy were deliberate choices I made and directed the AI to implement.
 - **AI algorithm design** — I chose the probability density approach based on competitive Battleship literature and guided the implementation through the three-tier difficulty system.
-- **UX decisions** — The targeting reticle hover effect, the 3D board perspective angle, and the sound design choices were my creative direction.
+- **UX decisions** — The targeting reticle hover effect, ship color scheme, and the sound design choices were my creative direction.
 - **Quality bar** — I drove the hardening pass that validated every socket event, added fleet composition checks, stripped leaked data from the API, and added memory cleanup. The AI executed, but I defined what "production-ready" meant.
+- **Bug diagnosis** — I identified the row 6+ click failures and directed the removal of 3D transforms as the root cause, after the AI attempted multiple partial fixes.
 
 The collaboration was most productive when I treated AI as a fast executor that I directed with clear intent, rather than delegating entire decisions to it.

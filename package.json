@@ -10,9 +10,12 @@
     "start": "npm run start --prefix server",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client",
     "db:migrate": "npm run db:migrate --prefix server",
-    "db:generate": "npm run db:generate --prefix server"
+    "db:generate": "npm run db:generate --prefix server",
+    "test": "npm test --prefix server",
+    "test:e2e": "npx playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "concurrently": "^9.1.0"
   }
 }
