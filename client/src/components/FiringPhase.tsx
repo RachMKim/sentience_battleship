@@ -38,7 +38,7 @@ export function FiringPhase({ gameState, onFire, lastShot, onClearShot }: Firing
   const myShipsRemaining = Object.entries(gameState.myShipHealth).filter(([, hp]) => hp > 0).length;
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+    <div className="flex flex-col items-center px-4 py-8">
       {/* Turn indicator */}
       <motion.div
         key={isMyTurn ? 'my-turn' : 'their-turn'}

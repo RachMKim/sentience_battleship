@@ -34,62 +34,6 @@
 }
 
 @layer utilities {
-  .perspective-board {
-    perspective: none;
-  }
-
-  .board-3d {
-    transform: none;
-  }
-
-  .cell-3d {
-    transform-style: preserve-3d;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.06),
-      inset 0 -1px 0 rgba(0,0,0,0.3),
-      0 2px 4px rgba(0,0,0,0.4),
-      0 1px 0 rgba(0,0,0,0.2);
-    transform: translateZ(2px);
-  }
-
-  .cell-3d-water {
-    box-shadow:
-      inset 0 1px 0 rgba(0,180,255,0.08),
-      inset 0 -2px 4px rgba(0,0,0,0.4),
-      0 2px 4px rgba(0,0,0,0.4),
-      0 1px 0 rgba(0,0,0,0.2);
-    transform: translateZ(0px);
-    background-image:
-      linear-gradient(135deg, rgba(0,180,255,0.04) 0%, transparent 50%, rgba(0,100,200,0.04) 100%);
-  }
-
-  .cell-3d-hit {
-    box-shadow:
-      inset 0 2px 6px rgba(0,0,0,0.6),
-      inset 0 -1px 0 rgba(255,51,102,0.2),
-      0 0 12px rgba(255,51,102,0.3),
-      0 1px 0 rgba(0,0,0,0.2);
-    transform: translateZ(-1px);
-  }
-
-  .cell-3d-ship {
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.1),
-      inset 0 -2px 0 rgba(0,0,0,0.3),
-      0 3px 6px rgba(0,0,0,0.5),
-      0 1px 0 rgba(0,0,0,0.3);
-    transform: translateZ(4px);
-    background-image:
-      linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 40%, rgba(0,0,0,0.15) 100%);
-  }
-
-  .cell-3d-miss {
-    box-shadow:
-      inset 0 2px 4px rgba(0,0,0,0.5),
-      0 1px 0 rgba(0,0,0,0.2);
-    transform: translateZ(-1px);
-  }
-
   .board-frame {
     box-shadow:
       inset 0 2px 4px rgba(0,0,0,0.3),
@@ -100,6 +44,33 @@
       0 0 80px rgba(0,212,255,0.02);
     border: 2px solid rgba(36,58,94,0.6);
     background: linear-gradient(180deg, rgba(13,21,38,0.95) 0%, rgba(10,14,26,0.98) 100%);
+  }
+
+  .cell-water {
+    box-shadow:
+      inset 0 1px 0 rgba(0,180,255,0.08),
+      inset 0 -1px 2px rgba(0,0,0,0.3);
+    background-image:
+      linear-gradient(135deg, rgba(0,180,255,0.04) 0%, transparent 50%, rgba(0,100,200,0.04) 100%);
+  }
+
+  .cell-hit {
+    box-shadow:
+      inset 0 2px 6px rgba(0,0,0,0.5),
+      0 0 12px rgba(255,51,102,0.3);
+  }
+
+  .cell-ship {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.1),
+      inset 0 -1px 0 rgba(0,0,0,0.25);
+    background-image:
+      linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 40%, rgba(0,0,0,0.1) 100%);
+  }
+
+  .cell-miss {
+    box-shadow:
+      inset 0 2px 4px rgba(0,0,0,0.4);
   }
 
   .btn-3d {
@@ -150,7 +121,6 @@
 
   .water-shimmer {
     position: relative;
-    overflow: visible;
   }
 
   .water-shimmer::after {
@@ -168,7 +138,6 @@
     animation: shimmer 4s ease-in-out infinite;
     pointer-events: none;
     border-radius: inherit;
-    overflow: hidden;
   }
 
   @keyframes shimmer {
